@@ -165,10 +165,10 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <div class="form-group"><label>Type *</label>
         <select id="inp-type" onchange="onTypeChange()">
           <option value="تعبئة">Car fill (تعبئة)</option>
+          <option value="استلام">Received (استلام)</option>
           <option value="هدية">Gift (هدية)</option>
           <option value="بيع">Sale (بيع)</option>
           <option value="بيع مني">Sale personal (بيع مني)</option>
-          <option value="استلام">Received (استلام)</option>
           <option value="شراء">Purchase (شراء)</option>
           <option value="تعبئة من السيارة">From car (تعبئة من السيارة)</option>
         </select>
@@ -195,16 +195,22 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
     <div class="v-grid">
       <div class="v-wrap">
         <span class="v-lbl t10">10L vouchers <span class="v-stock" id="stock-show-10"></span></span>
-        <input type="number" id="inp-v10" value="0" min="0" step="1" oninput="checkStock()">
+        <input type="number" id="inp-v10" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal()">
       </div>
       <div class="v-wrap">
         <span class="v-lbl t20">20L vouchers <span class="v-stock" id="stock-show-20"></span></span>
-        <input type="number" id="inp-v20" value="0" min="0" step="1" oninput="checkStock()">
+        <input type="number" id="inp-v20" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal()">
       </div>
       <div class="v-wrap">
         <span class="v-lbl t30">30L vouchers <span class="v-stock" id="stock-show-30"></span></span>
-        <input type="number" id="inp-v30" value="0" min="0" step="1" oninput="checkStock()">
+        <input type="number" id="inp-v30" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal()">
       </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--rs)">
+      <span style="font-size:12px;color:var(--text2)">Total:</span>
+      <span id="voucher-total-lt" style="font-size:14px;font-weight:600;color:var(--text)">0 L</span>
+      <span style="font-size:12px;color:var(--text3)">·</span>
+      <span id="voucher-total-tanks" style="font-size:14px;font-weight:600;color:var(--green)">0.0 tanks</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <button class="btn btn-primary" id="add-btn" onclick="addEntry()">Add entry</button>
@@ -335,10 +341,10 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <div class="form-group"><label>Type *</label>
         <select id="edit-type" onchange="onEditTypeChange()">
           <option value="تعبئة">Car fill (تعبئة)</option>
+          <option value="استلام">Received (استلام)</option>
           <option value="هدية">Gift (هدية)</option>
           <option value="بيع">Sale (بيع)</option>
           <option value="بيع مني">Sale personal (بيع مني)</option>
-          <option value="استلام">Received (استلام)</option>
           <option value="شراء">Purchase (شراء)</option>
           <option value="تعبئة من السيارة">From car (تعبئة من السيارة)</option>
         </select>
@@ -605,6 +611,17 @@ function calcTotals(){
 }
 
 // ── Stock guard ──
+function updateVoucherTotal(){
+  const v10=parseInt(document.getElementById('inp-v10').value)||0;
+  const v20=parseInt(document.getElementById('inp-v20').value)||0;
+  const v30=parseInt(document.getElementById('inp-v30').value)||0;
+  const lt=toLt(v10,v20,v30);
+  const tanks=(lt/20).toFixed(1);
+  const elLt=document.getElementById('voucher-total-lt');
+  const elTanks=document.getElementById('voucher-total-tanks');
+  if(elLt) elLt.textContent=lt+' L';
+  if(elTanks) elTanks.textContent=tanks+' tanks';
+}
 function checkStock(){
   const type=document.getElementById('inp-type').value;
   if(!isConsume(type)){
@@ -642,10 +659,16 @@ function getLastNissanOdo(){
 }
 function onPersonChange(){
   const person=document.getElementById('inp-person').value;
+  const type=document.getElementById('inp-type').value;
   const sec=document.getElementById('odo-section');
-  if(isNissan(person)&&document.getElementById('inp-type').value==='تعبئة'){
+  if(isNissan(person)&&type==='تعبئة'){
+    // Reset vouchers when Nissan selected
+    document.getElementById('inp-v10').value=0;
+    document.getElementById('inp-v20').value=0;
+    document.getElementById('inp-v30').value=0;
     sec.classList.remove('hidden');updateOdoPreview();
   }else{sec.classList.add('hidden');}
+  updateVoucherTotal();
 }
 function onTypeChange(){
   const t=document.getElementById('inp-type').value;
@@ -655,8 +678,7 @@ function onTypeChange(){
   const v30=document.getElementById('inp-v30');
 
   if(t==='تعبئة'){
-    // Always set Nissan and reset vouchers
-    person.value=NISSAN_PERSON;
+    // Reset vouchers, leave person blank
     v10.value=0; v20.value=0; v30.value=0;
   } else if(t==='استلام'){
     // Default monthly allocation: 5×10L, 9×20L, 9×30L
@@ -1073,6 +1095,7 @@ document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',fun
 
 // ── Init ──
 document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+updateVoucherTotal();
 if(sbUrl&&sbKey){
   // Supabase configured: always start with empty entries, load from DB only
   entries=[];

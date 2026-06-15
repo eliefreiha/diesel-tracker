@@ -120,6 +120,7 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
   <button class="nav-btn" onclick="showPage('stock',this)">🛡 Stock</button>
   <button class="nav-btn" onclick="showPage('nissan',this)">🚗 Nissan</button>
   <button class="nav-btn" onclick="showPage('stats',this)">📊 Stats</button>
+  <button class="nav-btn" onclick="showPage('settings',this)">⚙️ Settings</button>
 </nav>
 
 <!-- LOG -->
@@ -182,9 +183,10 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 
     <!-- Odometer (Nissan only) -->
     <div class="odo-section hidden" id="odo-section">
-      <div class="odo-title">🚗 Nissan Odometer</div>
-      <div class="form-grid" style="margin-bottom:0">
+      <div class="odo-title">🚗 Nissan — fill details</div>
+      <div class="form-grid" style="margin-bottom:8px">
         <div class="form-group"><label>Current odometer (km)</label><input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()"></div>
+        <div class="form-group"><label>Actual liters received</label><input type="number" id="inp-actual-lt" placeholder="e.g. 28.5" min="0" step="0.5" oninput="updateOdoPreview()"><span style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank to auto-calculate from vouchers</span></div>
       </div>
       <div class="odo-last" id="odo-preview"></div>
     </div>
@@ -237,15 +239,22 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 <div id="page-nissan" class="page">
   <div class="metrics" id="nissan-metrics"></div>
   <div class="chart-box">
-    <div class="chart-title">🚗 Nissan — Distance per fill-up (km)</div>
-    <div class="chart-wrap" style="height:240px"><canvas id="nissanChart"></canvas></div>
+    <div class="chart-title">🚗 Nissan — km per 20L efficiency</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="nissanChart"></canvas></div>
   </div>
   <div class="section-title" style="margin-top:4px">Fill-up history</div>
+  <div id="nissan-range-wrap"></div>
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Date</th><th style="text-align:right">10L</th><th style="text-align:right">20L</th><th style="text-align:right">30L</th>
-        <th style="text-align:right">Liters</th><th style="text-align:right">Odometer (km)</th><th style="text-align:right">Distance (km)</th><th>Notes</th><th></th>
+        <th>Date</th>
+        <th style="text-align:right">10L</th><th style="text-align:right">20L</th><th style="text-align:right">30L</th>
+        <th style="text-align:right">Nominal (L)</th>
+        <th style="text-align:right">Actual (L)</th>
+        <th style="text-align:right">Odometer</th>
+        <th style="text-align:right">Distance</th>
+        <th style="text-align:right">km/20L</th>
+        <th>Notes</th><th></th>
       </tr></thead>
       <tbody id="nissan-body"></tbody>
     </table>
@@ -275,6 +284,48 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
   </div>
 </div>
 
+
+<!-- SETTINGS PAGE -->
+<div id="page-settings" class="page">
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:14px">Operation Types</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Add custom operation types with their coefficient (+1 adds to stock, -1 subtracts).</p>
+    <div id="op-types-list" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="form-group" style="min-width:160px"><label>Arabic name</label><input type="text" id="new-op-name" placeholder="e.g. تبرع"></div>
+      <div class="form-group"><label>Label (EN)</label><input type="text" id="new-op-label" placeholder="e.g. Donation"></div>
+      <div class="form-group"><label>Coefficient</label>
+        <select id="new-op-coeff" style="width:90px">
+          <option value="-1">-1 (use)</option>
+          <option value="1">+1 (add)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="addOpType()">Add type</button>
+    </div>
+  </div>
+  <div class="form-card" style="background:var(--surface2);border-style:dashed">
+    <div class="section-title" style="margin-bottom:8px">Default operation types (read-only)</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.8">
+      استلام (+1) · شراء (+1) · تعبئة (-1) · هدية (-1) · بيع (-1) · بيع مني (-1) · تعبئة من السيارة (0)
+    </div>
+  </div>
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:14px">Nissan Settings</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Default deduction per 20L voucher (liters)</label>
+        <input type="number" id="nissan-deduct" value="1" step="0.5" min="0" max="5" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">e.g. 1 → 20L voucher fills 19L actual</span>
+      </div>
+      <div class="form-group">
+        <label>km/L base for efficiency (liters)</label>
+        <input type="number" id="nissan-base" value="20" step="1" min="1" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">Default 20 → shows km per 20L</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT MODAL -->
 <div class="modal-bg" id="edit-modal">
   <div class="modal">
@@ -299,8 +350,11 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <div class="form-group"><label>Notes</label><input type="text" id="edit-notes"></div>
     </div>
     <div class="odo-section hidden" id="edit-odo-section">
-      <div class="odo-title">🚗 Nissan Odometer</div>
-      <div class="form-group"><label>Current odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
+      <div class="odo-title">🚗 Nissan — fill details</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Current odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
+        <div class="form-group"><label>Actual liters received</label><input type="number" id="edit-actual-lt" placeholder="e.g. 28.5" min="0" step="0.5"><span style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank to auto-calculate</span></div>
+      </div>
     </div>
     <div class="section-title" style="margin-bottom:8px">Vouchers</div>
     <div class="v-grid">
@@ -359,6 +413,79 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 // ── Constants ──
 const COEFF={'استلام':1,'شراء':1,'تعبئة':-1,'هدية':-1,'تعبئة من السيارة':0,'بيع':-1,'بيع مني':-1};
 const NISSAN_PERSON='نيسان';
+const LS_NISSAN='nissan_settings';
+const LS_OPTYPES='custom_op_types';
+
+function getNissanDeduct(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.deduct||1;}catch(e){return 1;}}
+function getNissanBase(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.base||20;}catch(e){return 20;}}
+function saveNissanSettings(){
+  const d=parseFloat(document.getElementById('nissan-deduct').value)||1;
+  const b=parseFloat(document.getElementById('nissan-base').value)||20;
+  try{localStorage.setItem(LS_NISSAN,JSON.stringify({deduct:d,base:b}));}catch(e){}
+  renderNissan();
+}
+function loadNissanSettings(){
+  const d=getNissanDeduct(),b=getNissanBase();
+  const el1=document.getElementById('nissan-deduct');
+  const el2=document.getElementById('nissan-base');
+  if(el1)el1.value=d;if(el2)el2.value=b;
+}
+
+// Custom op types
+function getCustomOpTypes(){try{return JSON.parse(localStorage.getItem(LS_OPTYPES)||'[]');}catch(e){return[];}}
+function saveCustomOpTypes(types){try{localStorage.setItem(LS_OPTYPES,JSON.stringify(types));}catch(e){}}
+function addOpType(){
+  const name=document.getElementById('new-op-name').value.trim();
+  const label=document.getElementById('new-op-label').value.trim();
+  const coeff=parseInt(document.getElementById('new-op-coeff').value);
+  if(!name){alert('Please enter a name');return;}
+  const types=getCustomOpTypes();
+  if(types.find(t=>t.name===name)){alert('Type already exists');return;}
+  types.push({name,label:label||name,coeff});
+  saveCustomOpTypes(types);
+  document.getElementById('new-op-name').value='';
+  document.getElementById('new-op-label').value='';
+  renderOpTypes();
+  refreshAllDropdowns();
+  toast('Operation type added ✓');
+}
+function removeOpType(name){
+  const types=getCustomOpTypes().filter(t=>t.name!==name);
+  saveCustomOpTypes(types);
+  renderOpTypes();
+  refreshAllDropdowns();
+  toast('Removed');
+}
+function renderOpTypes(){
+  const types=getCustomOpTypes();
+  const el=document.getElementById('op-types-list');
+  if(!el)return;
+  if(!types.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">No custom types yet.</p>';return;}
+  el.innerHTML=types.map(t=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;font-weight:500;min-width:80px">${t.name}</span>
+      <span style="font-size:13px;color:var(--text2)">${t.label}</span>
+      <span class="badge ${t.coeff>0?'b-recv':'b-sale'}" style="margin-left:auto">${t.coeff>0?'+1 (add)':'-1 (use)'}</span>
+      <button class="btn btn-sm btn-del" onclick="removeOpType('${t.name}')">✕</button>
+    </div>`).join('');
+}
+function refreshAllDropdowns(){
+  const types=getCustomOpTypes();
+  const extra=types.map(t=>`<option value="${t.name}">${t.label} (${t.name})</option>`).join('');
+  ['inp-type','edit-type'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    // remove old custom options
+    [...sel.options].filter(o=>o.dataset.custom).forEach(o=>o.remove());
+    if(extra){
+      const div=document.createElement('div');
+      div.innerHTML=`<option disabled>──────────</option>${extra}`;
+      [...div.children].forEach(o=>{if(o.tagName==='OPTION'){o.dataset.custom='1';sel.appendChild(o);}});
+    }
+  });
+  // Also update COEFF map
+  types.forEach(t=>{COEFF[t.name]=t.coeff;});
+}
 const toLt=(v10,v20,v30)=>(v10||0)*10+(v20||0)*20+(v30||0)*30;
 const fmtDate=d=>new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 const typeLabel=t=>({'تعبئة':'Car fill','هدية':'Gift','بيع':'Sale','استلام':'Received','شراء':'Purchase','بيع مني':'Sale (personal)','تعبئة من السيارة':'From car'}[t]||t);
@@ -419,7 +546,7 @@ async function loadFromSupabase(){
   try{
     const data=await sbFetch('diesel_entries?order=date_str.asc,id.asc&limit=5000');
     if(data){
-      entries=data.map(r=>({id:r.id,dateStr:r.date_str,type:r.type,person:r.person||'',v10:r.v10||0,v20:r.v20||0,v30:r.v30||0,odometer:r.odometer||null,notes:r.notes||''}));
+      entries=data.map(r=>({id:r.id,dateStr:r.date_str,type:r.type,person:r.person||'',v10:r.v10||0,v20:r.v20||0,v30:r.v30||0,odometer:r.odometer||null,actualLt:r.actual_lt||null,notes:r.notes||''}));
       nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;
       setConnStatus('online','Connected');
     }
@@ -428,14 +555,14 @@ async function loadFromSupabase(){
 
 async function sbInsert(entry){
   if(!sbUrl||!sbKey)return entry;
-  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,notes:entry.notes||null};
+  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt||null,notes:entry.notes||null};
   const data=await sbFetch('diesel_entries',{method:'POST',body:JSON.stringify(body)});
   return data?{...entry,id:data[0].id}:entry;
 }
 
 async function sbUpdate(entry){
   if(!sbUrl||!sbKey)return;
-  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,notes:entry.notes||null};
+  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt||null,notes:entry.notes||null};
   await sbFetch(`diesel_entries?id=eq.${entry.id}`,{method:'PATCH',body:JSON.stringify(body)});
 }
 
@@ -521,10 +648,14 @@ function onPersonChange(){
   }else{sec.classList.add('hidden');}
 }
 function onTypeChange(){
+  // Auto-fill Nissan when Car fill selected
+  if(document.getElementById('inp-type').value==='تعبئة'){
+    const p=document.getElementById('inp-person');
+    if(!p.value||p.value.trim()==='') p.value=NISSAN_PERSON;
+  }
   onPersonChange();
   updateStockLabels();
   checkStock();
-  // hide odometer if not car fill
   if(document.getElementById('inp-type').value!=='تعبئة') document.getElementById('odo-section').classList.add('hidden');
 }
 function updateOdoPreview(){
@@ -640,9 +771,10 @@ async function addEntry(){
   const v30=parseInt(document.getElementById('inp-v30').value)||0;
   const notes=document.getElementById('inp-notes').value.trim();
   const odometer=isNissan(person)&&type==='تعبئة'?(parseInt(document.getElementById('inp-odo').value)||null):null;
+  const actualLt=isNissan(person)&&type==='تعبئة'?(parseFloat(document.getElementById('inp-actual-lt').value)||null):null;
   if(!dateStr){alert('Please select a date.');return;}
   if(v10===0&&v20===0&&v30===0){alert('Enter at least one voucher.');return;}
-  let entry={id:nextId++,dateStr,type,person,v10,v20,v30,odometer,notes};
+  let entry={id:nextId++,dateStr,type,person,v10,v20,v30,odometer,actualLt,notes};
   entries.push(entry);
   localSave();
   if(sbUrl&&sbKey){
@@ -650,6 +782,7 @@ async function addEntry(){
   }
   document.getElementById('inp-v10').value=0;document.getElementById('inp-v20').value=0;document.getElementById('inp-v30').value=0;
   document.getElementById('inp-notes').value='';document.getElementById('inp-person').value='';document.getElementById('inp-odo').value='';
+  document.getElementById('inp-actual-lt').value='';
   document.getElementById('odo-section').classList.add('hidden');
   document.getElementById('stock-warn').classList.remove('show');
   const lt=toLt(v10,v20,v30);
@@ -669,6 +802,7 @@ function openEdit(id){
   document.getElementById('edit-v20').value=e.v20||0;
   document.getElementById('edit-v30').value=e.v30||0;
   document.getElementById('edit-odo').value=e.odometer||'';
+  document.getElementById('edit-actual-lt').value=e.actualLt||'';
   document.getElementById('edit-notes').value=e.notes||'';
   document.getElementById('edit-odo-section').classList.toggle('hidden',!(isNissan(e.person)&&e.type==='تعبئة'));
   document.getElementById('edit-modal').classList.add('open');
@@ -684,6 +818,7 @@ async function saveEdit(){
   e.v20=parseInt(document.getElementById('edit-v20').value)||0;
   e.v30=parseInt(document.getElementById('edit-v30').value)||0;
   e.odometer=isNissan(e.person)&&e.type==='تعبئة'?(parseInt(document.getElementById('edit-odo').value)||null):null;
+  e.actualLt=isNissan(e.person)&&e.type==='تعبئة'?(parseFloat(document.getElementById('edit-actual-lt').value)||null):null;
   e.notes=document.getElementById('edit-notes').value.trim();
   localSave();
   if(sbUrl&&sbKey){try{await sbUpdate(e);}catch(err){toast('⚠ Saved locally, sync failed');}}
@@ -710,47 +845,137 @@ function renderStock(){
 
 // ── Nissan page ──
 function renderNissan(){
+  const base=getNissanBase();
+  const deductPer20=getNissanDeduct();
   const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+
+  // Effective liters: use actualLt if set, else vouchers minus deduction
+  function effectiveLt(e){
+    if(e.actualLt) return e.actualLt;
+    const nom=toLt(e.v10,e.v20,e.v30);
+    return nom - (deductPer20/20)*nom;
+  }
+
   const fillsWithOdo=fills.filter(e=>e.odometer);
   const distances=[];
-  for(let i=1;i<fillsWithOdo.length;i++)distances.push(fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer);
-  const totalLt=fills.reduce((s,e)=>s+toLt(e.v10,e.v20,e.v30),0);
+  for(let i=1;i<fillsWithOdo.length;i++) distances.push(fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer);
+
+  const totalNomLt=fills.reduce((s,e)=>s+toLt(e.v10,e.v20,e.v30),0);
+  const totalActLt=fills.reduce((s,e)=>s+effectiveLt(e),0);
   const avgDist=distances.length?Math.round(distances.reduce((a,b)=>a+b,0)/distances.length):0;
   const lastOdo=fillsWithOdo.length?fillsWithOdo[fillsWithOdo.length-1].odometer:0;
   const totalDist=fillsWithOdo.length>1?fillsWithOdo[fillsWithOdo.length-1].odometer-fillsWithOdo[0].odometer:0;
+  const totalDistLt=fills.slice(1).reduce((s,e)=>s+effectiveLt(e),0);
+  const overallEff=totalDistLt>0?(totalDist/totalDistLt*base).toFixed(1):0;
+
   document.getElementById('nissan-metrics').innerHTML=`
-    <div class="metric green"><div class="metric-label">Total fills</div><div class="metric-val">${fills.length}</div><div class="metric-sub">${totalLt} L · ${(totalLt/20).toFixed(1)} tanks</div></div>
+    <div class="metric green"><div class="metric-label">Total fills</div><div class="metric-val">${fills.length}</div><div class="metric-sub">${totalNomLt}L nominal · ${totalActLt.toFixed(1)}L actual</div></div>
     <div class="metric"><div class="metric-label">Last odometer</div><div class="metric-val">${lastOdo?lastOdo.toLocaleString():'—'}</div><div class="metric-sub">km</div></div>
     <div class="metric"><div class="metric-label">Avg distance/fill</div><div class="metric-val">${avgDist?avgDist.toLocaleString()+'km':'—'}</div><div class="metric-sub">between fill-ups</div></div>
+    <div class="metric accent"><div class="metric-label">km per ${base}L</div><div class="metric-val">${overallEff||'—'}</div><div class="metric-sub">overall efficiency</div></div>
     <div class="metric"><div class="metric-label">Total tracked</div><div class="metric-val">${totalDist?totalDist.toLocaleString():'—'}</div><div class="metric-sub">km since first reading</div></div>`;
-  // Chart
-  const lbls=fillsWithOdo.slice(1).map(e=>fmtDate(e.dateStr));
+
+  // Date range filter
+  const rangeHtml=`<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+    <div class="form-group"><label style="font-size:12px;color:var(--text2)">From</label><input type="date" id="nissan-from" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
+    <div class="form-group"><label style="font-size:12px;color:var(--text2)">To</label><input type="date" id="nissan-to" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
+    <button class="btn btn-sm" onclick="clearNissanFilter()">Clear</button>
+    <span id="nissan-range-avg" style="font-size:13px;color:var(--text2);margin-left:8px"></span>
+  </div>`;
+  document.getElementById('nissan-range-wrap').innerHTML=rangeHtml;
+
+  // Build dist map
+  const distMap={}, effMap={};
+  for(let i=1;i<fillsWithOdo.length;i++){
+    const dist=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
+    distMap[fillsWithOdo[i].id]=dist;
+    const actLt=effectiveLt(fillsWithOdo[i]);
+    effMap[fillsWithOdo[i].id]=actLt>0?(dist/actLt*base).toFixed(1):'—';
+  }
+
+  renderNissanFiltered(fills,distMap,effMap,effectiveLt,base);
+
+  // Chart - km/base per fill
+  const chartFills=fillsWithOdo.filter(e=>effMap[e.id]&&effMap[e.id]!=='—');
+  const lbls=chartFills.map(e=>fmtDate(e.dateStr));
+  const vals=chartFills.map(e=>parseFloat(effMap[e.id]));
   destroyChart('nissanChart');
-  if(distances.length){
+  if(vals.length){
     charts['nissanChart']=new Chart(document.getElementById('nissanChart'),{
-      type:'bar',
-      data:{labels:lbls,datasets:[{data:distances,backgroundColor:'#185FA5',borderRadius:4,label:'Distance (km)'}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{title:{display:true,text:'km',font:{size:11}},ticks:{font:{size:11}}}}}
+      type:'line',
+      data:{labels:lbls,datasets:[{data:vals,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',tension:.3,pointRadius:3,borderWidth:2,fill:true,label:`km/${base}L`}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{title:{display:true,text:`km per ${base}L`,font:{size:11}},ticks:{font:{size:11}}}}}
     });
   }
-  // Table
-  const distMap={};
-  for(let i=1;i<fillsWithOdo.length;i++)distMap[fillsWithOdo[i].id]=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
-  document.getElementById('nissan-body').innerHTML=fills.slice().reverse().map(e=>{
-    const lt=toLt(e.v10,e.v20,e.v30);
+}
+
+function renderNissanFiltered(fills,distMap,effMap,effectiveLt,base){
+  const base2=base||getNissanBase();
+  const deductPer20=getNissanDeduct();
+  function effLt(e){if(e.actualLt)return e.actualLt;const nom=toLt(e.v10,e.v20,e.v30);return nom-(deductPer20/20)*nom;}
+
+  // Get fills if not passed
+  if(!fills) fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+  if(!distMap){
+    const fillsWithOdo=fills.filter(e=>e.odometer);
+    distMap={}; effMap={};
+    for(let i=1;i<fillsWithOdo.length;i++){
+      const dist=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
+      distMap[fillsWithOdo[i].id]=dist;
+      const actLt=effLt(fillsWithOdo[i]);
+      effMap[fillsWithOdo[i].id]=actLt>0?(dist/actLt*base2).toFixed(1):'—';
+    }
+    if(!effectiveLt) effectiveLt=effLt;
+  }
+
+  const fromEl=document.getElementById('nissan-from');
+  const toEl=document.getElementById('nissan-to');
+  const fromDate=fromEl&&fromEl.value?new Date(fromEl.value):null;
+  const toDate=toEl&&toEl.value?new Date(toEl.value):null;
+
+  let filtered=fills.slice().reverse();
+  if(fromDate) filtered=filtered.filter(e=>new Date(e.dateStr)>=fromDate);
+  if(toDate) filtered=filtered.filter(e=>new Date(e.dateStr)<=toDate);
+
+  // Range average km/base
+  if((fromDate||toDate)&&document.getElementById('nissan-range-avg')){
+    const rangeFills=filtered.filter(e=>distMap[e.id]&&effMap[e.id]&&effMap[e.id]!=='—');
+    if(rangeFills.length){
+      const avgEff=(rangeFills.reduce((s,e)=>s+parseFloat(effMap[e.id]),0)/rangeFills.length).toFixed(1);
+      const totalD=rangeFills.reduce((s,e)=>s+distMap[e.id],0);
+      document.getElementById('nissan-range-avg').innerHTML=`<strong>${rangeFills.length} fills</strong> · avg <strong>${avgEff} km/${base2}L</strong> · ${totalD.toLocaleString()} km total`;
+    } else {
+      document.getElementById('nissan-range-avg').textContent='No fills with odometer in range';
+    }
+  } else if(document.getElementById('nissan-range-avg')){
+    document.getElementById('nissan-range-avg').textContent='';
+  }
+
+  document.getElementById('nissan-body').innerHTML=filtered.map(e=>{
+    const nom=toLt(e.v10,e.v20,e.v30);
+    const act=effectiveLt(e);
     return`<tr>
       <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
       <td style="text-align:right;color:var(--text3)">${e.v10||''}</td>
       <td style="text-align:right;color:var(--text3)">${e.v20||''}</td>
       <td style="text-align:right;color:var(--text3)">${e.v30||''}</td>
-      <td style="text-align:right;font-weight:600">${lt}</td>
+      <td style="text-align:right;font-weight:600">${nom}</td>
+      <td style="text-align:right;color:var(--green);font-weight:600">${act.toFixed(1)}</td>
       <td style="text-align:right">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
-      <td style="text-align:right;color:var(--green);font-weight:600">${distMap[e.id]!=null?distMap[e.id].toLocaleString()+' km':'—'}</td>
+      <td style="text-align:right;color:var(--green);font-weight:${distMap[e.id]?'600':'400'}">${distMap[e.id]?distMap[e.id].toLocaleString()+' km':'—'}</td>
+      <td style="text-align:right;color:var(--navy);font-weight:600">${effMap[e.id]||'—'}</td>
       <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
       <td><button class="btn btn-sm btn-edit" onclick="openEdit(${e.id})">✏️</button></td>
     </tr>`;
   }).join('');
 }
+
+function clearNissanFilter(){
+  const f=document.getElementById('nissan-from'),t=document.getElementById('nissan-to');
+  if(f)f.value='';if(t)t.value='';
+  renderNissanFiltered();
+}
+
 
 // ── Charts ──
 const charts={};

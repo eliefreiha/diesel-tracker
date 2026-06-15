@@ -611,6 +611,65 @@ function calcTotals(){
 }
 
 // ── Stock guard ──
+function prefillAddEntry(){
+  // Set type to تعبئة and person to نيسان
+  const typeEl=document.getElementById('inp-type');
+  const personEl=document.getElementById('inp-person');
+  if(!typeEl||!personEl) return;
+  typeEl.value='تعبئة';
+  personEl.value=NISSAN_PERSON;
+
+  // Reset vouchers
+  document.getElementById('inp-v10').value=0;
+  document.getElementById('inp-v20').value=0;
+  document.getElementById('inp-v30').value=0;
+  updateVoucherTotal();
+  updateStockLabels();
+
+  // Show odometer section
+  document.getElementById('odo-section').classList.remove('hidden');
+
+  // Calculate suggested odometer
+  const nissanFills=entries
+    .filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer)
+    .sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+
+  if(nissanFills.length===0){updateOdoPreview();return;}
+
+  const lastFill=nissanFills[nissanFills.length-1];
+  const lastOdo=lastFill.odometer;
+  const lastDate=new Date(lastFill.dateStr);
+  const today=new Date();
+  const daysSinceLast=Math.max(1,Math.round((today-lastDate)/(1000*60*60*24)));
+
+  // Calculate avg km/day from history
+  let avgKmDay=0;
+  if(nissanFills.length>=2){
+    const distances=[];
+    for(let i=1;i<nissanFills.length;i++){
+      const dist=nissanFills[i].odometer-nissanFills[i-1].odometer;
+      const days=Math.max(1,Math.round((new Date(nissanFills[i].dateStr)-new Date(nissanFills[i-1].dateStr))/(1000*60*60*24)));
+      if(dist>0) distances.push(dist/days);
+    }
+    if(distances.length) avgKmDay=distances.reduce((a,b)=>a+b,0)/distances.length;
+  }
+
+  const suggestedOdo=avgKmDay>0
+    ? Math.round(lastOdo + avgKmDay*daysSinceLast)
+    : lastOdo;
+
+  document.getElementById('inp-odo').value=suggestedOdo;
+
+  // Show preview
+  const avgKmFill=avgKmDay>0?Math.round(avgKmDay*daysSinceLast):null;
+  const prev=document.getElementById('odo-preview');
+  if(prev){
+    let txt=`Last fill: <strong>${lastOdo.toLocaleString()} km</strong> on ${fmtDate(lastFill.dateStr)} · <strong>${daysSinceLast} days ago</strong>`;
+    if(avgKmDay>0) txt+=` · avg ${avgKmDay.toFixed(0)} km/day → suggested <strong>+${avgKmFill} km</strong>`;
+    prev.innerHTML=txt;
+  }
+}
+
 function updateVoucherTotal(){
   const v10=parseInt(document.getElementById('inp-v10').value)||0;
   const v20=parseInt(document.getElementById('inp-v20').value)||0;
@@ -1090,6 +1149,7 @@ function showPage(name,btn){
   document.getElementById('page-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
+  if(name==='add') prefillAddEntry();
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
 
@@ -1103,7 +1163,7 @@ if(sbUrl&&sbKey){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
   setConnStatus('loading','Loading from Supabase...');
   renderAll();
-  loadFromSupabase().then(()=>renderAll()).catch(e=>setConnStatus('offline','Failed: '+e.message));
+  loadFromSupabase().then(()=>{renderAll();prefillAddEntry();}).catch(e=>setConnStatus('offline','Failed: '+e.message));
 }else{
   entries=localLoad();
   nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;

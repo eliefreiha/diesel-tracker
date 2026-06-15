@@ -189,10 +189,10 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
         <div class="form-group">
           <label>Actual liters received</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <input type="number" id="inp-actual-lt" placeholder="Auto" min="0" step="0.5" oninput="onActualLtInput()" style="flex:1">
-            <button type="button" class="btn btn-sm" onclick="resetActualLt()" title="Reset to auto" style="white-space:nowrap;padding:6px 10px">↺ Auto</button>
+            <input type="number" id="inp-actual-lt" placeholder="0" min="0" step="0.5" oninput="onActualLtManual()" style="flex:1">
+            <button type="button" class="btn btn-sm" onclick="resetActualLt()" title="Recalculate from vouchers" style="white-space:nowrap;padding:6px 10px">↺</button>
           </div>
-          <span style="font-size:11px;color:var(--text3);margin-top:2px" id="actual-lt-hint"></span>
+          <span style="font-size:11px;margin-top:2px" id="actual-lt-hint"></span>
         </div>
       </div>
       <div class="odo-last" id="odo-preview"></div>
@@ -450,6 +450,7 @@ function toggleOpActive(name){
   const state=getOpActiveState();
   state[name]=!isOpActive(name);
   try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(state));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('op_active_state',state);
   renderDefaultOpToggles();
   refreshAllDropdowns();
 }
@@ -478,6 +479,8 @@ function saveNissanSettings(){
   const d=parseFloat(document.getElementById('nissan-deduct').value)||1;
   const b=parseFloat(document.getElementById('nissan-base').value)||20;
   try{localStorage.setItem(LS_NISSAN,JSON.stringify({deduct:d,base:b}));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('nissan_settings',{deduct:d,base:b});
+  refreshActualLtHint();
   renderNissan();
 }
 function loadNissanSettings(){
@@ -489,7 +492,10 @@ function loadNissanSettings(){
 
 // Custom op types
 function getCustomOpTypes(){try{return JSON.parse(localStorage.getItem(LS_OPTYPES)||'[]');}catch(e){return[];}}
-function saveCustomOpTypes(types){try{localStorage.setItem(LS_OPTYPES,JSON.stringify(types));}catch(e){}}
+function saveCustomOpTypes(types){
+  try{localStorage.setItem(LS_OPTYPES,JSON.stringify(types));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('custom_op_types',types);
+}
 function addOpType(){
   const name=document.getElementById('new-op-name').value.trim();
   const label=document.getElementById('new-op-label').value.trim();
@@ -571,6 +577,34 @@ function loadConfig(){
   sbUrl='https://vubtcaleouuqktscjiqy.supabase.co'; sbKey='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1YnRjYWxlb3V1cWt0c2NqaXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MTk1OTcsImV4cCI6MjA5NzA5NTU5N30.IMmXYM17U9SS5vUlCyEL7iDdYzbV1ZnPdyYN_GuKKDM';
 }
 function saveConfig(url,key){sbUrl=url;sbKey=key;localStorage.setItem(CFG_KEY,JSON.stringify({url,key}));}
+
+// ── Supabase settings store ──
+async function sbGetSetting(k){
+  try{const d=await sbFetch(`app_settings?key=eq.${encodeURIComponent(k)}`);return d&&d[0]?d[0].value:null;}catch(e){return null;}
+}
+async function sbSetSetting(k,v){
+  try{
+    await sbFetch('app_settings',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates'},body:JSON.stringify({key:k,value:v})});
+  }catch(e){console.warn('sbSetSetting failed',e);}
+}
+async function loadSettingsFromSupabase(){
+  const ops=await sbGetSetting('custom_op_types');
+  if(ops&&Array.isArray(ops)){
+    try{localStorage.setItem(LS_OPTYPES,JSON.stringify(ops));}catch(e){}
+  }
+  const active=await sbGetSetting('op_active_state');
+  if(active&&typeof active==='object'){
+    try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(active));}catch(e){}
+  }
+  const nissan=await sbGetSetting('nissan_settings');
+  if(nissan&&typeof nissan==='object'){
+    try{localStorage.setItem(LS_NISSAN,JSON.stringify(nissan));}catch(e){}
+  }
+  renderOpTypes();
+  renderDefaultOpToggles();
+  refreshAllDropdowns();
+  loadNissanSettings();
+}
 function clearCacheReload(){localStorage.removeItem("diesel_tracker_v1");localStorage.removeItem("diesel_tracker_v2");localStorage.removeItem("diesel_tracker_v3");localStorage.removeItem(LS_KEY);toast("Cache cleared — reloading...");setTimeout(()=>location.reload(),800);}
 function clearSetup(){if(!confirm('Disconnect from Supabase? Data already synced stays in DB.'))return;sbUrl='';sbKey='';localStorage.removeItem(CFG_KEY);closeModal('setup-modal');setConnStatus('offline','Not connected');toast('Disconnected');}
 function openSetup(){document.getElementById('setup-url').value=sbUrl;document.getElementById('setup-key').value=sbKey;document.getElementById('setup-msg').textContent='';document.getElementById('setup-modal').classList.add('open');}
@@ -722,7 +756,7 @@ function prefillAddEntry(){
     : lastOdo;
 
   document.getElementById('inp-odo').value=suggestedOdo;
-  document.getElementById('inp-actual-lt').value=''; // reset to auto
+  _actualLtManual=false; // reset to auto mode
   refreshActualLtHint();
 
   // Show preview
@@ -804,6 +838,7 @@ function onTypeChange(){
   if(t==='تعبئة'){
     // Reset vouchers, leave person blank
     v10.value=0; v20.value=0; v30.value=0;
+    _actualLtManual=false;
   } else if(t==='استلام'){
     // Default monthly allocation: 5×10L, 9×20L, 9×30L
     if(!person.value||person.value.trim()==='') person.value='الجيش';
@@ -826,23 +861,24 @@ function calcAutoActualLt(){
   const deduct=getNissanDeduct();
   return nomLt - (deduct/20)*nomLt;
 }
+let _actualLtManual=false;
 function refreshActualLtHint(){
   const hint=document.getElementById('actual-lt-hint');
-  if(!hint)return;
   const inp=document.getElementById('inp-actual-lt');
+  if(!inp)return;
   const auto=calcAutoActualLt();
   const nom=toLt(parseInt(document.getElementById('inp-v10').value)||0,parseInt(document.getElementById('inp-v20').value)||0,parseInt(document.getElementById('inp-v30').value)||0);
-  if(!inp.value||inp.value===''){
-    hint.textContent=`Auto: ${auto.toFixed(1)}L (${nom}L nominal − ${(nom-auto).toFixed(1)}L deduction)`;
-    hint.style.color='var(--green)';
+  if(!_actualLtManual){
+    // Always show and set auto value
+    inp.value=auto>0?auto.toFixed(1):'';
+    if(hint){hint.textContent=`Auto-calculated: ${nom}L nominal − ${(nom-auto).toFixed(1)}L deduction`;hint.style.color='var(--green)';}
   } else {
-    hint.textContent=`Manual: ${parseFloat(inp.value).toFixed(1)}L · click ↺ to reset to auto (${auto.toFixed(1)}L)`;
-    hint.style.color='var(--text3)';
+    if(hint){hint.textContent=`Manual · click ↺ to recalculate (auto = ${auto.toFixed(1)}L)`;hint.style.color='var(--text3)';}
   }
 }
-function onActualLtInput(){ refreshActualLtHint(); updateOdoPreview(); }
+function onActualLtManual(){ _actualLtManual=true; refreshActualLtHint(); updateOdoPreview(); }
 function resetActualLt(){
-  document.getElementById('inp-actual-lt').value='';
+  _actualLtManual=false;
   refreshActualLtHint();
   updateOdoPreview();
 }
@@ -1260,7 +1296,7 @@ if(sbUrl&&sbKey){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
   setConnStatus('loading','Loading from Supabase...');
   renderAll();
-  loadFromSupabase().then(()=>{renderAll();prefillAddEntry();}).catch(e=>setConnStatus('offline','Failed: '+e.message));
+  loadFromSupabase().then(()=>{renderAll();loadSettingsFromSupabase().then(()=>prefillAddEntry());}).catch(e=>setConnStatus('offline','Failed: '+e.message));
 }else{
   entries=localLoad();
   nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;

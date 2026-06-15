@@ -369,9 +369,10 @@ const excelToDate=n=>{const d=new Date((n-25569)*86400000);return new Date(d.get
 
 // ── Supabase config ──
 const CFG_KEY='diesel_sb_config';
-let sbUrl='', sbKey='';
+let sbUrl='https://vubtcaleouuqktscjiqy.supabase.co', sbKey='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1YnRjYWxlb3V1cWt0c2NqaXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MTk1OTcsImV4cCI6MjA5NzA5NTU5N30.IMmXYM17U9SS5vUlCyEL7iDdYzbV1ZnPdyYN_GuKKDM';
 function loadConfig(){
-  try{const c=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');sbUrl=c.url||'';sbKey=c.key||'';}catch(e){}
+  // credentials hardcoded - always connected
+  sbUrl='https://vubtcaleouuqktscjiqy.supabase.co'; sbKey='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1YnRjYWxlb3V1cWt0c2NqaXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MTk1OTcsImV4cCI6MjA5NzA5NTU5N30.IMmXYM17U9SS5vUlCyEL7iDdYzbV1ZnPdyYN_GuKKDM';
 }
 function saveConfig(url,key){sbUrl=url;sbKey=key;localStorage.setItem(CFG_KEY,JSON.stringify({url,key}));}
 function clearCacheReload(){localStorage.removeItem("diesel_tracker_v1");localStorage.removeItem("diesel_tracker_v2");localStorage.removeItem("diesel_tracker_v3");localStorage.removeItem(LS_KEY);toast("Cache cleared — reloading...");setTimeout(()=>location.reload(),800);}

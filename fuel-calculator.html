@@ -150,11 +150,11 @@ tr:hover td{background:var(--surface2)}
     </table>
   </div>
 
-  <div class="section-title">Full breakdown — voucher combos</div>
+  <div class="section-title">Breakdown — 10L to 100L</div>
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Combo</th><th>Nominal (L)</th><th>Actual (L)</th>
+        <th>Liters</th><th>Actual (L)</th>
         <th>Deduction</th><th>Value (LBP)</th><th>Cost/liter (LBP)</th>
       </tr></thead>
       <tbody id="main-table"></tbody>
@@ -242,29 +242,24 @@ function recalc(){
     </tr>`;
   }).join('');
 
-  // Main table
-  const combos=[
-    {label:'1×10L',v10:1,v20:0,v30:0},{label:'1×20L',v10:0,v20:1,v30:0},{label:'1×30L',v10:0,v20:0,v30:1},
-    {label:'2×20L',v10:0,v20:2,v30:0},{label:'1×20L+1×30L',v10:0,v20:1,v30:1},{label:'2×30L',v10:0,v20:0,v30:2},
-    {label:'2×20L+1×30L',v10:0,v20:2,v30:1},{label:'4×20L',v10:0,v20:4,v30:0},{label:'3×30L',v10:0,v20:0,v30:3},
-    {label:'5×20L',v10:0,v20:5,v30:0},{label:'2×20L+2×30L',v10:0,v20:2,v30:2},{label:'4×30L',v10:0,v20:0,v30:4},
-    {label:'3×20L+2×30L',v10:0,v20:3,v30:2},{label:'5×20L+1×30L',v10:0,v20:5,v30:1},{label:'5×30L',v10:0,v20:0,v30:5},
-    {label:'5×20L+2×30L',v10:0,v20:5,v30:2},{label:'4×20L+3×30L',v10:0,v20:4,v30:3},{label:'5×20L+3×30L',v10:0,v20:5,v30:3},
-    {label:'5×20L+4×30L',v10:0,v20:5,v30:4},{label:'5×20L+5×30L',v10:0,v20:5,v30:5},
-  ];
-  document.getElementById('main-table').innerHTML=combos.map(c=>{
-    const nom=c.v10*10+c.v20*20+c.v30*30;
-    const act=c.v10*getActualLiters(10)+c.v20*getActualLiters(20)+c.v30*getActualLiters(30);
+  // Main table - simple 10 to 100L
+  const rows=[];
+  for(let nom=10;nom<=100;nom+=10){
+    const act=getActualLiters(nom);
     const val=act*priceLt;
-    const cpl=act>0?(price20*(nom/20))/act:0;
+    const cpl=act>0?(nom*priceLt)/act:0;
     let ded;
     if(mode===1){const d=parseFloat(document.getElementById('deduct-lt').value)||1;ded=`-${fmtLt((d/20)*nom)} L`;}
     else{const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;ded=`-${fmt(fee*(nom/20))} LBP`;}
-    return `<tr>
-      <td>${c.label}</td><td>${nom} L</td><td class="green-val">${fmtLt(act)} L</td>
-      <td class="red-val">${ded}</td><td>${fmt(val)} LBP</td><td>${fmt(cpl)} LBP</td>
-    </tr>`;
-  }).join('');
+    rows.push(`<tr>
+      <td><strong>${nom} L</strong></td>
+      <td class="green-val">${fmtLt(act)} L</td>
+      <td class="red-val">${ded}</td>
+      <td>${fmt(val)} LBP</td>
+      <td>${fmt(cpl)} LBP</td>
+    </tr>`);
+  }
+  document.getElementById('main-table').innerHTML=rows.join('');
 }
 
 function saveSettings(){

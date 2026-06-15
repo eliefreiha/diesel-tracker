@@ -648,15 +648,32 @@ function onPersonChange(){
   }else{sec.classList.add('hidden');}
 }
 function onTypeChange(){
-  // Auto-fill Nissan when Car fill selected
-  if(document.getElementById('inp-type').value==='تعبئة'){
-    const p=document.getElementById('inp-person');
-    if(!p.value||p.value.trim()==='') p.value=NISSAN_PERSON;
+  const t=document.getElementById('inp-type').value;
+  const person=document.getElementById('inp-person');
+  const v10=document.getElementById('inp-v10');
+  const v20=document.getElementById('inp-v20');
+  const v30=document.getElementById('inp-v30');
+
+  if(t==='تعبئة'){
+    // Auto-fill Nissan
+    if(!person.value||person.value.trim()==='') person.value=NISSAN_PERSON;
+    // Clear vouchers if all zero
+    if((parseInt(v10.value)||0)===0&&(parseInt(v20.value)||0)===0&&(parseInt(v30.value)||0)===0){
+      v10.value=0; v20.value=1; v30.value=1;
+    }
+  } else if(t==='استلام'){
+    // Default monthly allocation: 5×10L, 9×20L, 9×30L
+    if(!person.value||person.value.trim()==='') person.value='الجيش';
+    v10.value=5; v20.value=9; v30.value=9;
+  } else {
+    // Reset vouchers to 0 when switching to other types
+    if(t!=='شراء'){v10.value=0;v20.value=0;v30.value=0;}
   }
+
   onPersonChange();
   updateStockLabels();
   checkStock();
-  if(document.getElementById('inp-type').value!=='تعبئة') document.getElementById('odo-section').classList.add('hidden');
+  if(t!=='تعبئة') document.getElementById('odo-section').classList.add('hidden');
 }
 function updateOdoPreview(){
   const last=getLastNissanOdo();

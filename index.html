@@ -196,6 +196,24 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
         </div>
       </div>
       <div class="odo-last" id="odo-preview"></div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--text2);font-weight:600">Quick settings:</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:11px;color:var(--text2)">Mode</label>
+          <select id="quick-nissan-mode" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)" onchange="onQuickNissanChange()">
+            <option value="1">Mode 1 — Liter deduction</option>
+            <option value="2">Mode 2 — Cash fee (LBP)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px" id="quick-deduct-wrap">
+          <label style="font-size:11px;color:var(--text2)">Deduct (L per 20L)</label>
+          <input type="number" id="quick-deduct-lt" value="1" step="0.5" min="0" max="5" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);width:65px" onchange="onQuickNissanChange()">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px" id="quick-fee-wrap">
+          <label style="font-size:11px;color:var(--text2)">Fee per 20L (LBP)</label>
+          <input type="number" id="quick-fee-lbp" value="115000" step="1000" min="0" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);width:100px" onchange="onQuickNissanChange()">
+        </div>
+      </div>
     </div>
 
     <div class="section-title" style="margin-bottom:8px">Vouchers</div>
@@ -347,6 +365,10 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
         <span style="font-size:11px;color:var(--text3);margin-top:3px">Default 20 → shows km per 20L</span>
       </div>
     </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="bulkUpdateActualLt()">🔄 Recalculate actual liters for all Nissan fills</button>
+      <span id="bulk-update-msg" style="font-size:13px;color:var(--text2)"></span>
+    </div>
   </div>
 </div>
 
@@ -487,6 +509,41 @@ const LS_OPTYPES='custom_op_types';
 
 function getNissanDeduct(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.deduct||1;}catch(e){return 1;}}
 function getNissanBase(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.base||20;}catch(e){return 20;}}
+async function bulkUpdateActualLt(){
+  const msg=document.getElementById('bulk-update-msg');
+  if(msg) msg.textContent='Calculating...';
+  const mode=getNissanMode();
+  const deduct=getNissanDeduct();
+  const feeLbp=getNissanFeeLbp();
+  const pricePer20=parseFloat(localStorage.getItem('fuel_price_20')||'2350000');
+  const priceLt=pricePer20/20;
+
+  const nissanFills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person));
+  let updated=0;
+  for(const e of nissanFills){
+    const nomLt=toLt(e.v10,e.v20,e.v30);
+    let actLt;
+    if(mode===1){
+      actLt=nomLt-(deduct/20)*nomLt;
+    } else {
+      const totalFee=feeLbp*(nomLt/20);
+      actLt=Math.max(0,(nomLt*priceLt-totalFee)/priceLt);
+    }
+    actLt=parseFloat(actLt.toFixed(1));
+    e.actualLt=actLt;
+    if(sbUrl&&sbKey){
+      try{await sbFetch(`diesel_entries?id=eq.${e.id}`,{method:'PATCH',body:JSON.stringify({actual_lt:actLt})});}
+      catch(err){console.warn('patch failed',e.id,err);}
+    }
+    updated++;
+  }
+  localSave();
+  renderAll();
+  if(msg) msg.textContent=`✓ Updated ${updated} Nissan fill records`;
+  toast(`Updated ${updated} Nissan fills ✓`);
+  setTimeout(()=>{if(msg)msg.textContent='';},4000);
+}
+
 function saveNissanSettings(){
   const d=parseFloat(document.getElementById('nissan-deduct').value)||1;
   const b=parseFloat(document.getElementById('nissan-base').value)||20;
@@ -842,7 +899,7 @@ function onPersonChange(){
     document.getElementById('inp-v10').value=0;
     document.getElementById('inp-v20').value=0;
     document.getElementById('inp-v30').value=0;
-    sec.classList.remove('hidden');updateOdoPreview();
+    sec.classList.remove('hidden');syncQuickNissanSettings();updateOdoPreview();
   }else{sec.classList.add('hidden');}
   updateVoucherTotal();
 }
@@ -871,24 +928,59 @@ function onTypeChange(){
   checkStock();
   if(t!=='تعبئة') document.getElementById('odo-section').classList.add('hidden');
 }
+function syncQuickNissanSettings(){
+  // Sync quick settings from the main settings
+  const modeEl=document.getElementById('quick-nissan-mode');
+  const deductEl=document.getElementById('quick-deduct-lt');
+  const feeEl=document.getElementById('quick-fee-lbp');
+  if(modeEl) modeEl.value=getNissanMode();
+  if(deductEl) deductEl.value=getNissanDeduct();
+  if(feeEl) feeEl.value=getNissanFeeLbp();
+  updateQuickNissanVisibility();
+}
+function updateQuickNissanVisibility(){
+  const mode=parseInt(document.getElementById('quick-nissan-mode')?.value||2);
+  const d=document.getElementById('quick-deduct-wrap');
+  const f=document.getElementById('quick-fee-wrap');
+  if(d) d.style.display=mode===1?'flex':'none';
+  if(f) f.style.display=mode===2?'flex':'none';
+}
+function onQuickNissanChange(){
+  // Apply quick settings changes to main settings
+  const mode=parseInt(document.getElementById('quick-nissan-mode')?.value||2);
+  const deduct=parseFloat(document.getElementById('quick-deduct-lt')?.value||1);
+  const fee=parseFloat(document.getElementById('quick-fee-lbp')?.value||115000);
+  const base=getNissanBase();
+  const obj={deduct,base,mode,feeLbp:fee};
+  try{localStorage.setItem(LS_NISSAN,JSON.stringify(obj));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('nissan_settings',obj);
+  // Sync back to settings page fields
+  const el1=document.getElementById('nissan-deduct');
+  const el2=document.getElementById('nissan-mode');
+  const el3=document.getElementById('nissan-fee-lbp');
+  if(el1)el1.value=deduct;if(el2)el2.value=mode;if(el3)el3.value=fee;
+  updateQuickNissanVisibility();
+  refreshActualLtHint();
+}
 function calcAutoActualLt(){
   const v10=parseInt(document.getElementById('inp-v10').value)||0;
   const v20=parseInt(document.getElementById('inp-v20').value)||0;
   const v30=parseInt(document.getElementById('inp-v30').value)||0;
   const nomLt=toLt(v10,v20,v30);
-  const mode=getNissanMode();
+  // Use quick settings if visible, else fall back to saved settings
+  const quickMode=document.getElementById('quick-nissan-mode');
+  const mode=quickMode?parseInt(quickMode.value):getNissanMode();
   if(mode===1){
-    const deduct=getNissanDeduct();
+    const quickDeduct=document.getElementById('quick-deduct-lt');
+    const deduct=quickDeduct?parseFloat(quickDeduct.value)||1:getNissanDeduct();
     return nomLt-(deduct/20)*nomLt;
   } else {
-    // Mode 2: cash fee per 20L → fill rest in fuel
-    const feePer20=getNissanFeeLbp();
-    // need price from fuel calc settings or use a default
+    const quickFee=document.getElementById('quick-fee-lbp');
+    const feePer20=quickFee?parseFloat(quickFee.value)||0:getNissanFeeLbp();
     const pricePer20=parseFloat(localStorage.getItem('fuel_price_20')||'2350000');
     const priceLt=pricePer20/20;
     const totalFee=feePer20*(nomLt/20);
-    const fuelValue=nomLt*priceLt - totalFee;
-    return Math.max(0, fuelValue/priceLt);
+    return Math.max(0,(nomLt*priceLt-totalFee)/priceLt);
   }
 }
 let _actualLtManual=false;

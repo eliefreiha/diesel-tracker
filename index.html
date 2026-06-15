@@ -442,9 +442,7 @@ async function sbDelete(id){
 const LS_KEY='diesel_tracker_v4';
 const SEED=[];
 
-function seedEntries(){
-  return SEED.map((r,i)=>({id:i,dateStr:excelToDate(r[0]).toISOString().split('T')[0],type:r[1],person:r[2],v10:r[3],v20:r[4],v30:r[5],odometer:r[7]||null,notes:r[8]||''}));
-}
+function seedEntries(){return [];}
 function localSave(){try{localStorage.setItem(LS_KEY,JSON.stringify(entries));}catch(e){}}
 function localLoad(){if(sbUrl&&sbKey)return[];try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}return seedEntries();}
 

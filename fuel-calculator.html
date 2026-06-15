@@ -13,27 +13,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .header-icon{width:36px;height:36px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .header h1{font-size:16px;font-weight:600}.header p{font-size:11px;opacity:.6;margin-top:1px}
 .header-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.hbtn{color:#fff;text-decoration:none;font-size:12px;opacity:.85;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;white-space:nowrap;cursor:pointer;background:transparent}
+.hbtn{color:#fff;text-decoration:none;font-size:12px;opacity:.85;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;white-space:nowrap;background:transparent;cursor:pointer}
 .hbtn:hover{opacity:1;background:rgba(255,255,255,.1)}
-.page{padding:20px;max-width:800px;margin:0 auto}
+.page{padding:20px;max-width:900px;margin:0 auto}
 .price-hero{background:var(--navy);color:#fff;border-radius:var(--r);padding:18px 20px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center}
 .price-vals{display:flex;gap:24px;flex-wrap:wrap;flex:1}
 .phv{display:flex;flex-direction:column;gap:2px}
 .phv .lbl{font-size:11px;opacity:.6}
 .phv .val{font-size:22px;font-weight:700;line-height:1.1}
 .phv .sub{font-size:11px;opacity:.5}
-.price-status{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.75;margin-top:6px}
-.pdot{width:7px;height:7px;border-radius:50%;background:#aaa;flex-shrink:0}
+.price-meta{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#aaa}
 .pdot.live{background:#4ade80;animation:blink 2s infinite}
 .pdot.stale{background:#fbbf24}
-.pdot.loading{background:#fbbf24;animation:blink .8s infinite}
+.pdot.loading{background:#fbbf24;animation:blink .6s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.fetch-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;border-radius:var(--rs);font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.pstatus{font-size:11px;opacity:.7}
+.pupdate{font-size:11px;opacity:.6;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px}
+.src-links{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.src-link{font-size:11px;color:rgba(255,255,255,.6);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:3px 8px;border-radius:4px}
+.src-link:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+.fetch-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;border-radius:var(--rs);font-size:13px;cursor:pointer;flex-shrink:0}
 .fetch-btn:hover{background:rgba(255,255,255,.25)}
 .fetch-btn:disabled{opacity:.5;cursor:not-allowed}
-.src-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.src-link{font-size:11px;color:rgba(255,255,255,.6);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:3px 8px;border-radius:4px}
-.src-link:hover{color:#fff}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:16px}
 .card-title{font-size:13px;font-weight:600;margin-bottom:12px}
 .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:10px}
@@ -42,24 +44,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .fg input{font-size:14px;padding:8px 11px;border:1px solid rgba(0,0,0,.18);border-radius:var(--rs);background:var(--surface2);color:var(--text);width:100%;outline:none}
 .fg input:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,39,68,.1)}
 .fg .hint{font-size:11px;color:var(--text3);margin-top:2px}
-.mode-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;margin-bottom:12px;width:fit-content}
-.mode-btn{padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2)}
-.mode-btn.active{background:var(--navy);color:#fff}
-.info-box{border-radius:var(--rs);padding:10px 14px;font-size:13px;line-height:1.6;margin-bottom:16px}
-.info-box.m1{background:rgba(245,200,66,.08);border-left:3px solid var(--gold)}
-.info-box.m2{background:rgba(15,110,86,.08);border-left:3px solid var(--green)}
 .section-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);margin-bottom:18px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{padding:10px 16px;text-align:right;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:9px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border)}
 th:first-child{text-align:center}
-td{padding:11px 16px;border-bottom:1px solid var(--border);text-align:right}
+th.group-m1{background:rgba(245,200,66,.12);color:#854d0e;border-left:2px solid var(--gold)}
+th.group-m2{background:rgba(15,110,86,.1);color:#0F6E56;border-left:2px solid var(--green)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);text-align:right}
 td:first-child{text-align:center;font-weight:700;font-size:15px}
+td.m1-first{border-left:2px solid rgba(245,200,66,.3)}
+td.m2-first{border-left:2px solid rgba(15,110,86,.3)}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface2)}
-tr.bold td{font-weight:600;background:rgba(26,39,68,.03)}
 .green{color:var(--green);font-weight:600}
-.red{color:var(--red)}
+.red{color:var(--red);font-size:12px}
+.divider-col{width:8px;background:var(--surface2);padding:0;border-left:1px solid var(--border);border-right:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -77,19 +77,22 @@ tr.bold td{font-weight:600;background:rgba(26,39,68,.03)}
 
   <!-- Price hero -->
   <div class="price-hero">
-    <div style="flex:1;min-width:220px">
+    <div style="flex:1;min-width:200px">
       <div class="price-vals">
-        <div class="phv"><span class="lbl">صفيحة 20L — 95 Octane</span><span class="val" id="h-p20">—</span><span class="sub">LBP per 20L</span></div>
+        <div class="phv"><span class="lbl">صفيحة 20L · 95 Oct</span><span class="val" id="h-p20">—</span><span class="sub">LBP per 20L</span></div>
         <div class="phv"><span class="lbl">Per liter</span><span class="val" id="h-plt">—</span><span class="sub">LBP / L</span></div>
-        <div class="phv"><span class="lbl">Per actual liter</span><span class="val" id="h-eff">—</span><span class="sub">LBP / actual L</span></div>
       </div>
-      <div class="price-status"><span class="pdot" id="pdot"></span><span id="pstatus">Fetching latest price...</span></div>
+      <div class="price-meta">
+        <span class="pdot" id="pdot"></span>
+        <span class="pstatus" id="pstatus">Fetching...</span>
+        <span class="pupdate" id="pupdate" style="display:none"></span>
+      </div>
       <div class="src-links">
         <a href="https://www.iptgroup.com.lb/ipt/en/our-stations/fuel-prices" target="_blank" class="src-link">IPT Group ↗</a>
-        <a href="https://totalenergies.com.lb/en/service-station/fuels/fuel-prices" target="_blank" class="src-link">TotalEnergies Lebanon ↗</a>
+        <a href="https://totalenergies.com.lb/en/service-station/fuels/fuel-prices" target="_blank" class="src-link">TotalEnergies ↗</a>
       </div>
     </div>
-    <button class="fetch-btn" id="fetch-btn" onclick="fetchPrice()">🔄 Refresh</button>
+    <button class="fetch-btn" id="fetch-btn" onclick="fetchPrice()">🔄 Refresh price</button>
   </div>
 
   <!-- Settings -->
@@ -97,116 +100,104 @@ tr.bold td{font-weight:600;background:rgba(26,39,68,.03)}
     <div class="card-title">⚙️ Settings</div>
     <div class="form-row">
       <div class="fg">
-        <label>Price per صفيحة 20L (LBP) — override if needed</label>
+        <label>Price per صفيحة 20L (LBP) — edit to override</label>
         <input type="number" id="price20" value="2350000" step="1000" oninput="onManual()">
-        <span class="hint" id="price-hint">Auto-fetched on load · edit to override</span>
+        <span class="hint" id="price-hint">Auto-fetched on load</span>
       </div>
     </div>
-
-    <div class="card-title" style="margin-top:6px;margin-bottom:10px">Station deduction mode</div>
-    <div class="mode-toggle">
-      <button class="mode-btn active" id="btn-m1" onclick="setMode(1)">Mode 1 — Liter deduction</button>
-      <button class="mode-btn" id="btn-m2" onclick="setMode(2)">Mode 2 — Cash fee (LBP)</button>
-    </div>
-    <div id="s-m1" class="form-row">
-      <div class="fg">
-        <label>Liters deducted per 20L voucher</label>
-        <input type="number" id="deduct-lt" value="1" step="0.5" min="0" max="5" oninput="recalc()">
-        <span class="hint">Default 1L → you get 19L per 20L voucher</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">
+      <div style="border:1px solid rgba(245,200,66,.4);border-radius:var(--rs);padding:12px;background:rgba(245,200,66,.04)">
+        <div style="font-size:12px;font-weight:600;color:#854d0e;margin-bottom:8px">⚡ Mode 1 — Liter deduction</div>
+        <div class="fg">
+          <label>Liters deducted per 20L voucher</label>
+          <input type="number" id="deduct-lt" value="1" step="0.5" min="0" max="5" oninput="recalc()">
+          <span class="hint">Default: 1L → you get 19L per 20L</span>
+        </div>
       </div>
-    </div>
-    <div id="s-m2" class="form-row" style="display:none">
-      <div class="fg">
-        <label>Cash fee per 20L voucher (LBP)</label>
-        <input type="number" id="deduct-lbp" value="50000" step="1000" oninput="recalc()">
-        <span class="hint">Station fills equivalent liters of (price − fee)</span>
+      <div style="border:1px solid rgba(15,110,86,.4);border-radius:var(--rs);padding:12px;background:rgba(15,110,86,.04)">
+        <div style="font-size:12px;font-weight:600;color:#0F6E56;margin-bottom:8px">💰 Mode 2 — Cash fee (LBP)</div>
+        <div class="fg">
+          <label>Cash fee per 20L voucher (LBP)</label>
+          <input type="number" id="deduct-lbp" value="50000" step="1000" oninput="recalc()">
+          <span class="hint">Fills equivalent liters of (price − fee)</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="info-box" id="info-box"></div>
-
-  <!-- Main table -->
-  <div class="section-title">Liters breakdown — what you get & what it costs</div>
+  <!-- Combined table -->
+  <div class="section-title">Liters breakdown — Mode 1 vs Mode 2 side by side</div>
   <div class="table-wrap">
     <table>
-      <thead><tr>
-        <th>Liters</th>
-        <th>Actual liters received</th>
-        <th>Deduction</th>
-        <th>Value in LBP</th>
-        <th>Cost per actual liter</th>
-      </tr></thead>
+      <thead>
+        <tr>
+          <th rowspan="2">Liters</th>
+          <th colspan="3" class="group-m1">⚡ Mode 1 — Liter deduction</th>
+          <th class="divider-col" rowspan="2"></th>
+          <th colspan="3" class="group-m2">💰 Mode 2 — Cash fee</th>
+        </tr>
+        <tr>
+          <th class="group-m1">Actual (L)</th>
+          <th class="group-m1">Deducted</th>
+          <th class="group-m1">Value (LBP)</th>
+          <th class="divider-col"></th>
+          <th class="group-m2">Actual (L)</th>
+          <th class="group-m2">Fee (LBP)</th>
+          <th class="group-m2">Value (LBP)</th>
+        </tr>
+      </thead>
       <tbody id="main-table"></tbody>
     </table>
   </div>
 </div>
 
 <script>
-const LS='fuel_calc_v3';
-let mode=1, autoFetched=false;
+const LS='fuel_calc_v4';
+let autoFetched=false, lastPriceDate=null, lastPriceSource=null;
 const fmt=n=>Math.round(n).toLocaleString();
 const fmtLt=n=>(+n).toFixed(1);
 
-function setMode(m){
-  mode=m;
-  document.getElementById('btn-m1').classList.toggle('active',m===1);
-  document.getElementById('btn-m2').classList.toggle('active',m===2);
-  document.getElementById('s-m1').style.display=m===1?'':'none';
-  document.getElementById('s-m2').style.display=m===2?'':'none';
-  recalc(); save();
-}
+function getPrice(){ return parseFloat(document.getElementById('price20').value)||2350000; }
+function getDeductLt(){ return parseFloat(document.getElementById('deduct-lt').value)||1; }
+function getFeeLbp(){ return parseFloat(document.getElementById('deduct-lbp').value)||0; }
 
-function actualLiters(nom){
-  const p=parseFloat(document.getElementById('price20').value)||2350000;
-  if(mode===1){const d=parseFloat(document.getElementById('deduct-lt').value)||1;return nom-(d/20)*nom;}
-  else{const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;return (nom*p/20-fee*(nom/20))/(p/20);}
-}
-
-function deductDisplay(nom){
-  const p=parseFloat(document.getElementById('price20').value)||2350000;
-  if(mode===1){const d=parseFloat(document.getElementById('deduct-lt').value)||1;return `-${fmtLt((d/20)*nom)} L`;}
-  else{const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;return `-${fmt(fee*(nom/20))} LBP`;}
-}
+function actualM1(nom){ const d=getDeductLt(); return nom-(d/20)*nom; }
+function actualM2(nom){ const p=getPrice(); const fee=getFeeLbp()*(nom/20); return (nom*p/20-fee)/(p/20); }
 
 function onManual(){
-  autoFetched=false;
+  autoFetched=false; lastPriceDate=null;
   document.getElementById('price-hint').textContent='Manually overridden';
   document.getElementById('pdot').className='pdot stale';
   document.getElementById('pstatus').textContent='Price manually set';
+  document.getElementById('pupdate').style.display='none';
   recalc(); save();
 }
 
 function recalc(){
-  const p=parseFloat(document.getElementById('price20').value)||2350000;
+  const p=getPrice();
   const plt=p/20;
-  const act20=actualLiters(20);
-  const eff=p/act20;
-
   document.getElementById('h-p20').textContent=fmt(p);
   document.getElementById('h-plt').textContent=fmt(plt);
-  document.getElementById('h-eff').textContent=fmt(eff);
 
-  const act20L=actualLiters(20);
-  const dedTxt=mode===1
-    ?`${document.getElementById('deduct-lt').value}L taken per 20L → you get <strong>${fmtLt(act20L)}L</strong> actual`
-    :`${fmt(parseFloat(document.getElementById('deduct-lbp').value)||0)} LBP fee per 20L → station fills <strong>${fmtLt(act20L)}L</strong>`;
-  document.getElementById('info-box').className=`info-box m${mode}`;
-  document.getElementById('info-box').innerHTML=`<strong>Mode ${mode}:</strong> ${dedTxt}. Effective cost: <strong>${fmt(eff)} LBP/L</strong>.`;
-
-  // Table: 10 to 100 in steps of 10
   let rows='';
   for(let nom=10;nom<=100;nom+=10){
-    const act=actualLiters(nom);
-    const val=act*plt;
-    const cpl=val/act;
-    const bold=nom%20===0?'bold':'';
-    rows+=`<tr class="${bold}">
-      <td>${nom} L</td>
-      <td class="green">${fmtLt(act)} L</td>
-      <td class="red">${deductDisplay(nom)}</td>
-      <td>${fmt(val)} LBP</td>
-      <td>${fmt(cpl)} LBP/L</td>
+    // Mode 1
+    const a1=actualM1(nom);
+    const dedLt=fmtLt((getDeductLt()/20)*nom);
+    const val1=a1*plt;
+    // Mode 2
+    const a2=actualM2(nom);
+    const feeLbp=fmt(getFeeLbp()*(nom/20));
+    const val2=a2*plt;
+    rows+=`<tr>
+      <td>${nom}</td>
+      <td class="green m1-first">${fmtLt(a1)} L</td>
+      <td class="red">-${dedLt} L</td>
+      <td>${fmt(val1)}</td>
+      <td class="divider-col"></td>
+      <td class="green m2-first">${fmtLt(a2)} L</td>
+      <td class="red">-${feeLbp}</td>
+      <td>${fmt(val2)}</td>
     </tr>`;
   }
   document.getElementById('main-table').innerHTML=rows;
@@ -214,10 +205,12 @@ function recalc(){
 
 function save(){
   try{localStorage.setItem(LS,JSON.stringify({
-    price20:document.getElementById('price20').value,mode,
-    deductLt:document.getElementById('deduct-lt').value,
-    deductLbp:document.getElementById('deduct-lbp').value,
-    fetchedAt:autoFetched?Date.now():null
+    price20:getPrice(),
+    deductLt:getDeductLt(),
+    deductLbp:getFeeLbp(),
+    fetchedAt:autoFetched?Date.now():null,
+    priceDate:lastPriceDate,
+    priceSource:lastPriceSource
   }));}catch(e){}
 }
 
@@ -225,57 +218,65 @@ async function fetchPrice(){
   const btn=document.getElementById('fetch-btn');
   btn.disabled=true; btn.textContent='⏳ Fetching...';
   document.getElementById('pdot').className='pdot loading';
-  document.getElementById('pstatus').textContent='Searching for latest price...';
+  document.getElementById('pstatus').textContent='Searching for today\'s price...';
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-6',max_tokens:300,
         tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:'What is the current price of 95 octane gasoline per 20 liters (صفيحة) in Lebanon in LBP today? Return ONLY a JSON object like: {"price20":2350000,"date":"15 Jun 2026","source":"IPT"} with no other text.'}]
+        messages:[{role:'user',content:'Search for the current weekly price of 95 octane gasoline per 20 liters (صفيحة) in Lebanon in LBP. Check iptgroup.com.lb or totalenergies.com.lb or Lebanon Ministry of Energy. Return ONLY a JSON object: {"price20":2350000,"date":"15 Jun 2026","source":"IPT"} with no other text.'}]
       })
     });
     const data=await res.json();
     let txt='';
-    for(const b of data.content){if(b.type==='text'){txt=b.text;break;}}
+    for(const b of (data.content||[])){if(b.type==='text'){txt=b.text;break;}}
     const m=txt.match(/\{[^}]+\}/);
     if(m){
       const parsed=JSON.parse(m[0]);
-      if(parsed.price20&&parsed.price20>1000000){
+      if(parsed.price20&&parsed.price20>500000){
         document.getElementById('price20').value=parsed.price20;
         autoFetched=true;
-        const hint=`Auto-fetched · ${parsed.date||'today'} · ${parsed.source||'web'}`;
-        document.getElementById('price-hint').textContent=hint;
+        lastPriceDate=parsed.date||new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+        lastPriceSource=parsed.source||'web';
+        document.getElementById('price-hint').textContent=`Auto-fetched · ${lastPriceDate} · ${lastPriceSource}`;
         document.getElementById('pdot').className='pdot live';
-        document.getElementById('pstatus').textContent=hint;
+        document.getElementById('pstatus').textContent=`Live price from ${lastPriceSource}`;
+        const upd=document.getElementById('pupdate');
+        upd.textContent=`Last updated: ${lastPriceDate}`;
+        upd.style.display='inline';
         recalc(); save();
         btn.textContent='✓ Updated';
-        setTimeout(()=>{btn.textContent='🔄 Refresh';btn.disabled=false;},2000);
+        setTimeout(()=>{btn.textContent='🔄 Refresh price';btn.disabled=false;},2000);
         return;
       }
     }
     throw new Error('parse failed');
   }catch(e){
     document.getElementById('pdot').className='pdot stale';
-    document.getElementById('pstatus').textContent='Auto-fetch failed — using last saved price';
+    document.getElementById('pstatus').textContent='Auto-fetch failed — showing last saved';
     btn.textContent='🔄 Retry'; btn.disabled=false;
   }
 }
 
-// Load saved settings
+// Load saved
 try{
   const s=JSON.parse(localStorage.getItem(LS)||'{}');
   if(s.price20) document.getElementById('price20').value=s.price20;
   if(s.deductLt) document.getElementById('deduct-lt').value=s.deductLt;
   if(s.deductLbp) document.getElementById('deduct-lbp').value=s.deductLbp;
-  if(s.mode) setMode(s.mode);
+  if(s.priceDate) lastPriceDate=s.priceDate;
+  if(s.priceSource) lastPriceSource=s.priceSource;
   if(s.fetchedAt&&(Date.now()-s.fetchedAt)<6*3600*1000){
     autoFetched=true;
-    const d=new Date(s.fetchedAt);
-    const hint=`Auto-fetched · ${d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})} ${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
-    document.getElementById('price-hint').textContent=hint;
+    document.getElementById('price-hint').textContent=`Auto-fetched · ${lastPriceDate||''} · ${lastPriceSource||'web'}`;
     document.getElementById('pdot').className='pdot live';
-    document.getElementById('pstatus').textContent=hint;
+    document.getElementById('pstatus').textContent=`Live · ${lastPriceSource||'web'}`;
+    if(lastPriceDate){
+      const upd=document.getElementById('pupdate');
+      upd.textContent=`Last updated: ${lastPriceDate}`;
+      upd.style.display='inline';
+    }
     recalc();
   } else { recalc(); fetchPrice(); }
 }catch(e){recalc();fetchPrice();}

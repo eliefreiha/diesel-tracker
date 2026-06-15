@@ -587,7 +587,7 @@ function renderLog(){
   let rb10=0,rb20=0,rb30=0;
   const balMap={};
   sorted.forEach(e=>{
-    const sg=getSign(e.type);
+    const sg=e.type==='تعبئة من السيارة'?0:getSign(e.type);
     rb10+=sg*(e.v10||0); rb20+=sg*(e.v20||0); rb30+=sg*(e.v30||0);
     balMap[e.id]=toLt(Math.max(0,rb10),Math.max(0,rb20),Math.max(0,rb30));
   });

@@ -351,6 +351,11 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 <div id="toast"></div>
 
 <script>
+// ── Startup: always wipe stale local data ──
+(function(){
+  ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
+})();
+
 // ── Constants ──
 const COEFF={'استلام':1,'شراء':1,'تعبئة':-1,'هدية':-1,'تعبئة من السيارة':0,'بيع':-1,'بيع مني':-1};
 const NISSAN_PERSON='نيسان';

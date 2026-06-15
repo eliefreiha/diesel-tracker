@@ -186,7 +186,14 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <div class="odo-title">🚗 Nissan — fill details</div>
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-group"><label>Current odometer (km)</label><input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()"></div>
-        <div class="form-group"><label>Actual liters received</label><input type="number" id="inp-actual-lt" placeholder="e.g. 28.5" min="0" step="0.5" oninput="updateOdoPreview()"><span style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank to auto-calculate from vouchers</span></div>
+        <div class="form-group">
+          <label>Actual liters received</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="inp-actual-lt" placeholder="Auto" min="0" step="0.5" oninput="onActualLtInput()" style="flex:1">
+            <button type="button" class="btn btn-sm" onclick="resetActualLt()" title="Reset to auto" style="white-space:nowrap;padding:6px 10px">↺ Auto</button>
+          </div>
+          <span style="font-size:11px;color:var(--text3);margin-top:2px" id="actual-lt-hint"></span>
+        </div>
       </div>
       <div class="odo-last" id="odo-preview"></div>
     </div>
@@ -195,15 +202,15 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
     <div class="v-grid">
       <div class="v-wrap">
         <span class="v-lbl t10">10L vouchers <span class="v-stock" id="stock-show-10"></span></span>
-        <input type="number" id="inp-v10" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal()">
+        <input type="number" id="inp-v10" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
       </div>
       <div class="v-wrap">
         <span class="v-lbl t20">20L vouchers <span class="v-stock" id="stock-show-20"></span></span>
-        <input type="number" id="inp-v20" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal()">
+        <input type="number" id="inp-v20" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
       </div>
       <div class="v-wrap">
         <span class="v-lbl t30">30L vouchers <span class="v-stock" id="stock-show-30"></span></span>
-        <input type="number" id="inp-v30" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal()">
+        <input type="number" id="inp-v30" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--rs)">
@@ -309,11 +316,10 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <button class="btn btn-primary" onclick="addOpType()">Add type</button>
     </div>
   </div>
-  <div class="form-card" style="background:var(--surface2);border-style:dashed">
-    <div class="section-title" style="margin-bottom:8px">Default operation types (read-only)</div>
-    <div style="font-size:13px;color:var(--text2);line-height:1.8">
-      استلام (+1) · شراء (+1) · تعبئة (-1) · هدية (-1) · بيع (-1) · بيع مني (-1) · تعبئة من السيارة (0)
-    </div>
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:12px">Default operation types — toggle active/inactive</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Inactive types are hidden from the Add Entry dropdown. They still appear in the log.</p>
+    <div id="default-op-toggles"></div>
   </div>
   <div class="form-card">
     <div class="section-title" style="margin-bottom:14px">Nissan Settings</div>
@@ -420,6 +426,50 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 const COEFF={'استلام':1,'شراء':1,'تعبئة':-1,'هدية':-1,'تعبئة من السيارة':0,'بيع':-1,'بيع مني':-1};
 const NISSAN_PERSON='نيسان';
 const LS_NISSAN='nissan_settings';
+const LS_OP_ACTIVE='op_active_state';
+const DEFAULT_OPS=[
+  {name:'تعبئة',   label:'Car fill',        coeff:-1, active:true},
+  {name:'استلام',  label:'Received',         coeff:1,  active:true},
+  {name:'هدية',    label:'Gift',             coeff:-1, active:true},
+  {name:'بيع',     label:'Sale',             coeff:-1, active:true},
+  {name:'بيع مني', label:'Sale (personal)',  coeff:-1, active:true},
+  {name:'شراء',    label:'Purchase',         coeff:1,  active:true},
+  {name:'تعبئة من السيارة',label:'From car', coeff:0,  active:false},
+];
+function getOpActiveState(){
+  try{return JSON.parse(localStorage.getItem(LS_OP_ACTIVE)||'{}');}catch(e){return {};}
+}
+function isOpActive(name){
+  const state=getOpActiveState();
+  if(state[name]!==undefined) return state[name];
+  // default: تعبئة من السيارة inactive by default
+  const def=DEFAULT_OPS.find(o=>o.name===name);
+  return def?def.active:true;
+}
+function toggleOpActive(name){
+  const state=getOpActiveState();
+  state[name]=!isOpActive(name);
+  try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(state));}catch(e){}
+  renderDefaultOpToggles();
+  refreshAllDropdowns();
+}
+function renderDefaultOpToggles(){
+  const el=document.getElementById('default-op-toggles');
+  if(!el)return;
+  el.innerHTML=DEFAULT_OPS.map(op=>{
+    const active=isOpActive(op.name);
+    return`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;min-width:120px;font-weight:500">${op.name}</span>
+      <span style="font-size:12px;color:var(--text2);flex:1">${op.label} · ${op.coeff>0?'+1 (add)':op.coeff<0?'-1 (use)':'0 (no stock)'}</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <span style="color:${active?'var(--green)':'var(--text3)'}">${active?'Active':'Inactive'}</span>
+        <div onclick="toggleOpActive('${op.name}')" style="width:40px;height:22px;border-radius:11px;background:${active?'var(--green)':'var(--border2)'};cursor:pointer;position:relative;transition:background .2s">
+          <div style="width:18px;height:18px;border-radius:9px;background:#fff;position:absolute;top:2px;left:${active?'20px':'2px'};transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+        </div>
+      </label>
+    </div>`;
+  }).join('');
+}
 const LS_OPTYPES='custom_op_types';
 
 function getNissanDeduct(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.deduct||1;}catch(e){return 1;}}
@@ -476,21 +526,34 @@ function renderOpTypes(){
     </div>`).join('');
 }
 function refreshAllDropdowns(){
-  const types=getCustomOpTypes();
-  const extra=types.map(t=>`<option value="${t.name}">${t.label} (${t.name})</option>`).join('');
+  const customTypes=getCustomOpTypes();
   ['inp-type','edit-type'].forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel)return;
-    // remove old custom options
-    [...sel.options].filter(o=>o.dataset.custom).forEach(o=>o.remove());
-    if(extra){
-      const div=document.createElement('div');
-      div.innerHTML=`<option disabled>──────────</option>${extra}`;
-      [...div.children].forEach(o=>{if(o.tagName==='OPTION'){o.dataset.custom='1';sel.appendChild(o);}});
+    const curVal=sel.value;
+    // Rebuild all options respecting active state
+    sel.innerHTML='';
+    DEFAULT_OPS.forEach(op=>{
+      if(!isOpActive(op.name)&&id==='inp-type') return; // hide inactive in add form
+      const o=document.createElement('option');
+      o.value=op.name; o.textContent=`${op.label} (${op.name})`;
+      sel.appendChild(o);
+    });
+    if(customTypes.length){
+      const sep=document.createElement('option');
+      sep.disabled=true; sep.textContent='──────────';
+      sel.appendChild(sep);
+      customTypes.forEach(t=>{
+        const o=document.createElement('option');
+        o.value=t.name; o.textContent=`${t.label} (${t.name})`;
+        o.dataset.custom='1'; sel.appendChild(o);
+      });
     }
+    // restore value if still available
+    if([...sel.options].find(o=>o.value===curVal)) sel.value=curVal;
   });
-  // Also update COEFF map
-  types.forEach(t=>{COEFF[t.name]=t.coeff;});
+  // Update COEFF map
+  customTypes.forEach(t=>{COEFF[t.name]=t.coeff;});
 }
 const toLt=(v10,v20,v30)=>(v10||0)*10+(v20||0)*20+(v30||0)*30;
 const fmtDate=d=>new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
@@ -659,6 +722,8 @@ function prefillAddEntry(){
     : lastOdo;
 
   document.getElementById('inp-odo').value=suggestedOdo;
+  document.getElementById('inp-actual-lt').value=''; // reset to auto
+  refreshActualLtHint();
 
   // Show preview
   const avgKmFill=avgKmDay>0?Math.round(avgKmDay*daysSinceLast):null;
@@ -752,6 +817,34 @@ function onTypeChange(){
   updateStockLabels();
   checkStock();
   if(t!=='تعبئة') document.getElementById('odo-section').classList.add('hidden');
+}
+function calcAutoActualLt(){
+  const v10=parseInt(document.getElementById('inp-v10').value)||0;
+  const v20=parseInt(document.getElementById('inp-v20').value)||0;
+  const v30=parseInt(document.getElementById('inp-v30').value)||0;
+  const nomLt=toLt(v10,v20,v30);
+  const deduct=getNissanDeduct();
+  return nomLt - (deduct/20)*nomLt;
+}
+function refreshActualLtHint(){
+  const hint=document.getElementById('actual-lt-hint');
+  if(!hint)return;
+  const inp=document.getElementById('inp-actual-lt');
+  const auto=calcAutoActualLt();
+  const nom=toLt(parseInt(document.getElementById('inp-v10').value)||0,parseInt(document.getElementById('inp-v20').value)||0,parseInt(document.getElementById('inp-v30').value)||0);
+  if(!inp.value||inp.value===''){
+    hint.textContent=`Auto: ${auto.toFixed(1)}L (${nom}L nominal − ${(nom-auto).toFixed(1)}L deduction)`;
+    hint.style.color='var(--green)';
+  } else {
+    hint.textContent=`Manual: ${parseFloat(inp.value).toFixed(1)}L · click ↺ to reset to auto (${auto.toFixed(1)}L)`;
+    hint.style.color='var(--text3)';
+  }
+}
+function onActualLtInput(){ refreshActualLtHint(); updateOdoPreview(); }
+function resetActualLt(){
+  document.getElementById('inp-actual-lt').value='';
+  refreshActualLtHint();
+  updateOdoPreview();
 }
 function updateOdoPreview(){
   const last=getLastNissanOdo();

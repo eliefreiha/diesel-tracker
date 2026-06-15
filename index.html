@@ -146,7 +146,7 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
         <th>Date</th><th>Type</th><th>Person / Vehicle</th>
         <th style="text-align:right">10L</th><th style="text-align:right">20L</th><th style="text-align:right">30L</th>
         <th style="text-align:right">Liters</th><th style="text-align:right">Tanks</th>
-        <th>Odometer</th><th>Distance</th><th>Notes</th><th></th>
+        <th>Odometer</th><th>Distance</th><th style="text-align:right">Balance</th><th>Notes</th><th></th>
       </tr></thead>
       <tbody id="log-body"></tbody>
     </table>
@@ -582,6 +582,16 @@ function renderLog(){
   }).slice().reverse();
   const tb=document.getElementById('log-body');
   if(!filtered.length){tb.innerHTML=`<tr><td colspan="12"><div class="empty-state">No entries match your filters.</div></td></tr>`;return;}
+  // build running balance map (chronological order)
+  const sorted=[...entries].sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+  let rb10=0,rb20=0,rb30=0;
+  const balMap={};
+  sorted.forEach(e=>{
+    const sg=getSign(e.type);
+    rb10+=sg*(e.v10||0); rb20+=sg*(e.v20||0); rb30+=sg*(e.v30||0);
+    balMap[e.id]=toLt(Math.max(0,rb10),Math.max(0,rb20),Math.max(0,rb30));
+  });
+
   // build odometer distance map for nissan
   const nissanFills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
   const distMap={};
@@ -601,6 +611,7 @@ function renderLog(){
       <td style="text-align:right;color:var(--text2)">${(lt/20).toFixed(2)}</td>
       <td style="font-size:12px;color:var(--text2)">${odoCell}</td>
       <td style="font-size:12px;color:var(--green);font-weight:${distCell?'600':'400'}">${distCell}</td>
+      <td style="text-align:right;font-weight:600;color:${balMap[e.id]<50?'#dc2626':balMap[e.id]<100?'#BA7517':'var(--green)'}">${balMap[e.id]!=null?balMap[e.id]+' L':''}</td>
       <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-edit" onclick="openEdit(${e.id})">✏️</button>

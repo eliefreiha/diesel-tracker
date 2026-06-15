@@ -146,7 +146,7 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <thead><tr>
         <th>Date</th><th>Type</th><th>Person / Vehicle</th>
         <th style="text-align:right">10L</th><th style="text-align:right">20L</th><th style="text-align:right">30L</th>
-        <th style="text-align:right">Liters</th><th style="text-align:right">Tanks</th>
+        <th style="text-align:right">Liters</th><th style="text-align:right">Actual (L)</th><th style="text-align:right">Tanks</th>
         <th>Odometer</th><th>Distance</th><th style="text-align:right">Balance</th><th>Notes</th><th></th>
       </tr></thead>
       <tbody id="log-body"></tbody>
@@ -325,9 +325,21 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
     <div class="section-title" style="margin-bottom:14px">Nissan Settings</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Default deduction per 20L voucher (liters)</label>
+        <label>Deduction mode</label>
+        <select id="nissan-mode" onchange="saveNissanSettings()">
+          <option value="1">Mode 1 — Liter deduction</option>
+          <option value="2" selected>Mode 2 — Cash fee (LBP)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Liters deducted per 20L voucher (Mode 1)</label>
         <input type="number" id="nissan-deduct" value="1" step="0.5" min="0" max="5" oninput="saveNissanSettings()">
         <span style="font-size:11px;color:var(--text3);margin-top:3px">e.g. 1 → 20L voucher fills 19L actual</span>
+      </div>
+      <div class="form-group">
+        <label>Cash fee per 20L voucher in LBP (Mode 2)</label>
+        <input type="number" id="nissan-fee-lbp" value="115000" step="1000" min="0" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">Station takes this LBP and fills rest in fuel</span>
       </div>
       <div class="form-group">
         <label>km/L base for efficiency (liters)</label>
@@ -478,16 +490,23 @@ function getNissanBase(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)|
 function saveNissanSettings(){
   const d=parseFloat(document.getElementById('nissan-deduct').value)||1;
   const b=parseFloat(document.getElementById('nissan-base').value)||20;
-  try{localStorage.setItem(LS_NISSAN,JSON.stringify({deduct:d,base:b}));}catch(e){}
-  if(sbUrl&&sbKey) sbSetSetting('nissan_settings',{deduct:d,base:b});
+  const m=parseInt(document.getElementById('nissan-mode')?.value||2);
+  const f=parseFloat(document.getElementById('nissan-fee-lbp')?.value||115000);
+  const obj={deduct:d,base:b,mode:m,feeLbp:f};
+  try{localStorage.setItem(LS_NISSAN,JSON.stringify(obj));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('nissan_settings',obj);
   refreshActualLtHint();
   renderNissan();
 }
+function getNissanMode(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.mode||2;}catch(e){return 2;}}
+function getNissanFeeLbp(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.feeLbp||115000;}catch(e){return 115000;}}
 function loadNissanSettings(){
-  const d=getNissanDeduct(),b=getNissanBase();
+  const d=getNissanDeduct(),b=getNissanBase(),m=getNissanMode(),f=getNissanFeeLbp();
   const el1=document.getElementById('nissan-deduct');
   const el2=document.getElementById('nissan-base');
-  if(el1)el1.value=d;if(el2)el2.value=b;
+  const el3=document.getElementById('nissan-mode');
+  const el4=document.getElementById('nissan-fee-lbp');
+  if(el1)el1.value=d;if(el2)el2.value=b;if(el3)el3.value=m;if(el4)el4.value=f;
 }
 
 // Custom op types
@@ -589,17 +608,16 @@ async function sbSetSetting(k,v){
 }
 async function loadSettingsFromSupabase(){
   const ops=await sbGetSetting('custom_op_types');
-  if(ops&&Array.isArray(ops)){
-    try{localStorage.setItem(LS_OPTYPES,JSON.stringify(ops));}catch(e){}
-  }
+  if(ops&&Array.isArray(ops)){try{localStorage.setItem(LS_OPTYPES,JSON.stringify(ops));}catch(e){}}
   const active=await sbGetSetting('op_active_state');
-  if(active&&typeof active==='object'){
-    try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(active));}catch(e){}
-  }
+  if(active&&typeof active==='object'){try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(active));}catch(e){}}
   const nissan=await sbGetSetting('nissan_settings');
   if(nissan&&typeof nissan==='object'){
     try{localStorage.setItem(LS_NISSAN,JSON.stringify(nissan));}catch(e){}
+    if(nissan.feeLbp) localStorage.setItem('fuel_calc_fee_lbp',nissan.feeLbp);
   }
+  const fuelPrice=await sbGetSetting('fuel_price');
+  if(fuelPrice) localStorage.setItem('fuel_price_20',fuelPrice);
   renderOpTypes();
   renderDefaultOpToggles();
   refreshAllDropdowns();
@@ -858,8 +876,20 @@ function calcAutoActualLt(){
   const v20=parseInt(document.getElementById('inp-v20').value)||0;
   const v30=parseInt(document.getElementById('inp-v30').value)||0;
   const nomLt=toLt(v10,v20,v30);
-  const deduct=getNissanDeduct();
-  return nomLt - (deduct/20)*nomLt;
+  const mode=getNissanMode();
+  if(mode===1){
+    const deduct=getNissanDeduct();
+    return nomLt-(deduct/20)*nomLt;
+  } else {
+    // Mode 2: cash fee per 20L → fill rest in fuel
+    const feePer20=getNissanFeeLbp();
+    // need price from fuel calc settings or use a default
+    const pricePer20=parseFloat(localStorage.getItem('fuel_price_20')||'2350000');
+    const priceLt=pricePer20/20;
+    const totalFee=feePer20*(nomLt/20);
+    const fuelValue=nomLt*priceLt - totalFee;
+    return Math.max(0, fuelValue/priceLt);
+  }
 }
 let _actualLtManual=false;
 function refreshActualLtHint(){
@@ -963,6 +993,7 @@ function renderLog(){
       <td style="text-align:right;color:var(--text3)">${e.v20||''}</td>
       <td style="text-align:right;color:var(--text3)">${e.v30||''}</td>
       <td style="text-align:right;font-weight:600">${lt}</td>
+      <td style="text-align:right;font-weight:600;color:var(--green)">${e.actualLt!=null?e.actualLt.toFixed(1)+' L':'—'}</td>
       <td style="text-align:right;color:var(--text2)">${(lt/20).toFixed(2)}</td>
       <td style="font-size:12px;color:var(--text2)">${odoCell}</td>
       <td style="font-size:12px;color:var(--green);font-weight:${distCell?'600':'400'}">${distCell}</td>

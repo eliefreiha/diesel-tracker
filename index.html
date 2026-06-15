@@ -99,7 +99,44 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 .warn-box.show{display:block}
 .empty-state{text-align:center;padding:36px;color:var(--text3);font-size:14px}
 .nissan-badge{display:inline-flex;align-items:center;gap:4px;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
-@media(max-width:600px){.page{padding:12px}.stock-grid{grid-template-columns:1fr 1fr}.v-grid{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){
+  .page{padding:12px}
+  .metrics{grid-template-columns:1fr 1fr}
+  .stock-grid{grid-template-columns:1fr 1fr}
+  .v-grid{grid-template-columns:1fr}
+  .filter-bar{gap:6px}
+  .filter-bar input,.filter-bar select{max-width:100%!important;font-size:13px}
+  .form-grid{grid-template-columns:1fr}
+  .modes-row{grid-template-columns:1fr}
+  /* Hide less important log columns on mobile */
+  .col-hide-mobile{display:none}
+  /* Nav scrollable */
+  .nav{padding:0 12px}
+  .nav-btn{padding:10px 12px;font-size:12px}
+  /* Header compact */
+  .header{padding:10px 14px;gap:8px}
+  .header h1{font-size:14px}
+  .header-right{gap:6px}
+  .hbtn,.btn[style*="color:#fff"]{font-size:11px;padding:5px 8px}
+  /* Metric cards */
+  .metric-val{font-size:18px}
+  /* Stock grid */
+  .stock-grid{grid-template-columns:1fr 1fr}
+  /* Charts */
+  .chart-wrap canvas{max-height:200px}
+  /* Stats 2-col → 1-col */
+  div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  /* Modal full width */
+  .modal{width:95vw;padding:16px}
+  /* Nissan quick settings wrap */
+  .odo-section div[style*="display:flex;gap:14px"]{flex-direction:column;gap:8px}
+}
+@media(max-width:480px){
+  .metrics{grid-template-columns:1fr}
+  .stock-grid{grid-template-columns:1fr}
+  .header-right .hbtn:not(:last-child){display:none}
+  .nav-btn{padding:10px 8px;font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -145,9 +182,9 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
     <table>
       <thead><tr>
         <th>Date</th><th>Type</th><th>Person / Vehicle</th>
-        <th style="text-align:right">10L</th><th style="text-align:right">20L</th><th style="text-align:right">30L</th>
+        <th style="text-align:right" class="col-hide-mobile">10L</th><th style="text-align:right" class="col-hide-mobile">20L</th><th style="text-align:right" class="col-hide-mobile">30L</th>
         <th style="text-align:right">Liters</th><th style="text-align:right">Actual (L)</th><th style="text-align:right">Tanks</th>
-        <th>Odometer</th><th>Distance</th><th style="text-align:right">Balance</th><th>Notes</th><th></th>
+        <th class="col-hide-mobile">Odometer</th><th class="col-hide-mobile">Distance</th><th style="text-align:right">Balance</th><th>Notes</th><th></th>
       </tr></thead>
       <tbody id="log-body"></tbody>
     </table>
@@ -279,7 +316,7 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
     <table>
       <thead><tr>
         <th>Date</th>
-        <th style="text-align:right">10L</th><th style="text-align:right">20L</th><th style="text-align:right">30L</th>
+        <th style="text-align:right" class="col-hide-mobile">10L</th><th style="text-align:right" class="col-hide-mobile">20L</th><th style="text-align:right" class="col-hide-mobile">30L</th>
         <th style="text-align:right">Nominal (L)</th>
         <th style="text-align:right">Actual (L)</th>
         <th style="text-align:right">Odometer</th>
@@ -538,6 +575,10 @@ async function bulkUpdateActualLt(){
     updated++;
   }
   localSave();
+  // Force reload from Supabase to get fresh data
+  if(sbUrl&&sbKey){
+    await loadFromSupabase();
+  }
   renderAll();
   if(msg) msg.textContent=`✓ Updated ${updated} Nissan fill records`;
   toast(`Updated ${updated} Nissan fills ✓`);
@@ -1081,14 +1122,14 @@ function renderLog(){
       <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
       <td><span class="badge ${badgeClass(e.type)}">${typeLabel(e.type)}</span></td>
       <td>${e.person||'—'}</td>
-      <td style="text-align:right;color:var(--text3)">${e.v10||''}</td>
-      <td style="text-align:right;color:var(--text3)">${e.v20||''}</td>
-      <td style="text-align:right;color:var(--text3)">${e.v30||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v10||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v20||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v30||''}</td>
       <td style="text-align:right;font-weight:600">${lt}</td>
       <td style="text-align:right;font-weight:600;color:var(--green)">${e.actualLt!=null?e.actualLt.toFixed(1)+' L':'—'}</td>
       <td style="text-align:right;color:var(--text2)">${(lt/20).toFixed(2)}</td>
-      <td style="font-size:12px;color:var(--text2)">${odoCell}</td>
-      <td style="font-size:12px;color:var(--green);font-weight:${distCell?'600':'400'}">${distCell}</td>
+      <td style="font-size:12px;color:var(--text2)" class="col-hide-mobile">${odoCell}</td>
+      <td style="font-size:12px;color:var(--green);font-weight:${distCell?'600':'400'}" class="col-hide-mobile">${distCell}</td>
       <td style="text-align:right;font-weight:600;color:${balMap[e.id]<50?'#dc2626':balMap[e.id]<100?'#BA7517':'var(--green)'}">${balMap[e.id]!=null?balMap[e.id]+' L':''}</td>
       <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
       <td style="white-space:nowrap">
@@ -1305,9 +1346,9 @@ function renderNissanFiltered(fills,distMap,effMap,effectiveLt,base){
     const act=effectiveLt(e);
     return`<tr>
       <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
-      <td style="text-align:right;color:var(--text3)">${e.v10||''}</td>
-      <td style="text-align:right;color:var(--text3)">${e.v20||''}</td>
-      <td style="text-align:right;color:var(--text3)">${e.v30||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v10||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v20||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v30||''}</td>
       <td style="text-align:right;font-weight:600">${nom}</td>
       <td style="text-align:right;color:var(--green);font-weight:600">${act.toFixed(1)}</td>
       <td style="text-align:right">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>

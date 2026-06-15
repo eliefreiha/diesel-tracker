@@ -15,61 +15,59 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .header-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .hbtn{color:#fff;text-decoration:none;font-size:12px;opacity:.85;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;white-space:nowrap;cursor:pointer;background:transparent}
 .hbtn:hover{opacity:1;background:rgba(255,255,255,.1)}
-.page{padding:20px;max-width:960px;margin:0 auto}
+.page{padding:20px;max-width:800px;margin:0 auto}
 .price-hero{background:var(--navy);color:#fff;border-radius:var(--r);padding:18px 20px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center}
-.price-hero-vals{display:flex;gap:20px;flex-wrap:wrap}
+.price-vals{display:flex;gap:24px;flex-wrap:wrap;flex:1}
 .phv{display:flex;flex-direction:column;gap:2px}
 .phv .lbl{font-size:11px;opacity:.6}
-.phv .val{font-size:24px;font-weight:700;line-height:1}
+.phv .val{font-size:22px;font-weight:700;line-height:1.1}
 .phv .sub{font-size:11px;opacity:.5}
-.price-status{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.75;margin-top:4px}
+.price-status{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.75;margin-top:6px}
 .pdot{width:7px;height:7px;border-radius:50%;background:#aaa;flex-shrink:0}
-.pdot.live{background:#4ade80;animation:pulse 2s infinite}
+.pdot.live{background:#4ade80;animation:blink 2s infinite}
 .pdot.stale{background:#fbbf24}
-.pdot.loading{background:#fbbf24;animation:pulse .8s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.fetch-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;border-radius:var(--rs);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.pdot.loading{background:#fbbf24;animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.fetch-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;border-radius:var(--rs);font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .fetch-btn:hover{background:rgba(255,255,255,.25)}
 .fetch-btn:disabled{opacity:.5;cursor:not-allowed}
-.source-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.src-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .src-link{font-size:11px;color:rgba(255,255,255,.6);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:3px 8px;border-radius:4px}
-.src-link:hover{color:#fff;border-color:rgba(255,255,255,.5)}
-.settings-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:16px}
-.card-title{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text)}
-.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
-.form-group{display:flex;flex-direction:column;gap:5px}
-.form-group label{font-size:12px;font-weight:500;color:var(--text2)}
-.form-group input{font-size:14px;padding:8px 11px;border:1px solid rgba(0,0,0,.18);border-radius:var(--rs);background:var(--surface2);color:var(--text);width:100%;outline:none}
-.form-group input:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,39,68,.1)}
+.src-link:hover{color:#fff}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;margin-bottom:12px}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:10px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:12px;font-weight:500;color:var(--text2)}
+.fg input{font-size:14px;padding:8px 11px;border:1px solid rgba(0,0,0,.18);border-radius:var(--rs);background:var(--surface2);color:var(--text);width:100%;outline:none}
+.fg input:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,39,68,.1)}
+.fg .hint{font-size:11px;color:var(--text3);margin-top:2px}
 .mode-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;margin-bottom:12px;width:fit-content}
-.mode-btn{padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2)}
+.mode-btn{padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2)}
 .mode-btn.active{background:var(--navy);color:#fff}
-.info-box{border-radius:var(--rs);padding:11px 14px;font-size:13px;line-height:1.6;margin-bottom:16px}
-.info-box.mode1{background:rgba(245,200,66,.08);border-left:3px solid var(--gold)}
-.info-box.mode2{background:rgba(15,110,86,.08);border-left:3px solid var(--green)}
+.info-box{border-radius:var(--rs);padding:10px 14px;font-size:13px;line-height:1.6;margin-bottom:16px}
+.info-box.m1{background:rgba(245,200,66,.08);border-left:3px solid var(--gold)}
+.info-box.m2{background:rgba(15,110,86,.08);border-left:3px solid var(--green)}
 .section-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);margin-bottom:18px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{padding:9px 13px;text-align:right;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border)}
-th:first-child{text-align:left}
-td{padding:9px 13px;border-bottom:1px solid var(--border);text-align:right}
-td:first-child{text-align:left;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{padding:10px 16px;text-align:right;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border)}
+th:first-child{text-align:center}
+td{padding:11px 16px;border-bottom:1px solid var(--border);text-align:right}
+td:first-child{text-align:center;font-weight:700;font-size:15px}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface2)}
-.badge-v{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
-.v10{background:#fef9c3;color:#854d0e}.v20{background:#dbeafe;color:#1e40af}.v30{background:#ccfbf1;color:#0f5132}
-@media(prefers-color-scheme:dark){.v10{background:#451a03;color:#fcd34d}.v20{background:#1e3a5f;color:#93c5fd}.v30{background:#064e3b;color:#6ee7b7}}
-.green-val{color:var(--green);font-weight:600}
-.red-val{color:var(--red)}
+tr.bold td{font-weight:600;background:rgba(26,39,68,.03)}
+.green{color:var(--green);font-weight:600}
+.red{color:var(--red)}
 </style>
 </head>
 <body>
-
 <div class="header">
   <div class="header-icon">⛽</div>
   <div><h1>Fuel Voucher Calculator</h1><p>Lebanon 95 Octane · LBP pricing</p></div>
   <div class="header-right">
-    <a href="https://www.iptgroup.com.lb/ipt/en/our-stations/fuel-prices" target="_blank" class="hbtn">📡 IPT Prices ↗</a>
+    <a href="https://www.iptgroup.com.lb/ipt/en/our-stations/fuel-prices" target="_blank" class="hbtn">📡 IPT ↗</a>
     <a href="https://totalenergies.com.lb/en/service-station/fuels/fuel-prices" target="_blank" class="hbtn">📡 TotalEnergies ↗</a>
     <a href="index.html" class="hbtn">← Tracker</a>
   </div>
@@ -79,83 +77,65 @@ tr:hover td{background:var(--surface2)}
 
   <!-- Price hero -->
   <div class="price-hero">
-    <div style="flex:1;min-width:200px">
-      <div class="price-hero-vals">
-        <div class="phv">
-          <span class="lbl">95 Octane — صفيحة 20L</span>
-          <span class="val" id="hero-price20">—</span>
-          <span class="sub">LBP per 20 liters</span>
-        </div>
-        <div class="phv">
-          <span class="lbl">Per liter</span>
-          <span class="val" id="hero-pricelt">—</span>
-          <span class="sub">LBP / liter</span>
-        </div>
-        <div class="phv">
-          <span class="lbl">Effective / actual liter</span>
-          <span class="val" id="hero-effective">—</span>
-          <span class="sub">LBP / actual liter</span>
-        </div>
+    <div style="flex:1;min-width:220px">
+      <div class="price-vals">
+        <div class="phv"><span class="lbl">صفيحة 20L — 95 Octane</span><span class="val" id="h-p20">—</span><span class="sub">LBP per 20L</span></div>
+        <div class="phv"><span class="lbl">Per liter</span><span class="val" id="h-plt">—</span><span class="sub">LBP / L</span></div>
+        <div class="phv"><span class="lbl">Per actual liter</span><span class="val" id="h-eff">—</span><span class="sub">LBP / actual L</span></div>
       </div>
       <div class="price-status"><span class="pdot" id="pdot"></span><span id="pstatus">Fetching latest price...</span></div>
-      <div class="source-links">
+      <div class="src-links">
         <a href="https://www.iptgroup.com.lb/ipt/en/our-stations/fuel-prices" target="_blank" class="src-link">IPT Group ↗</a>
         <a href="https://totalenergies.com.lb/en/service-station/fuels/fuel-prices" target="_blank" class="src-link">TotalEnergies Lebanon ↗</a>
       </div>
     </div>
-    <button class="fetch-btn" id="fetch-btn" onclick="fetchPrice()">🔄 Refresh price</button>
+    <button class="fetch-btn" id="fetch-btn" onclick="fetchPrice()">🔄 Refresh</button>
   </div>
 
   <!-- Settings -->
-  <div class="settings-card">
-    <div class="card-title">⚙️ Settings — override price manually if needed</div>
+  <div class="card">
+    <div class="card-title">⚙️ Settings</div>
     <div class="form-row">
-      <div class="form-group">
-        <label>95 Octane price per صفيحة 20L (LBP)</label>
-        <input type="number" id="price20" value="2350000" step="1000" oninput="onPriceInput()">
-        <span style="font-size:11px;color:var(--text3);margin-top:2px" id="price-hint">Auto-fetched on load · edit to override</span>
+      <div class="fg">
+        <label>Price per صفيحة 20L (LBP) — override if needed</label>
+        <input type="number" id="price20" value="2350000" step="1000" oninput="onManual()">
+        <span class="hint" id="price-hint">Auto-fetched on load · edit to override</span>
       </div>
     </div>
-    <div class="card-title" style="margin-top:4px;margin-bottom:10px">Station deduction mode</div>
+
+    <div class="card-title" style="margin-top:6px;margin-bottom:10px">Station deduction mode</div>
     <div class="mode-toggle">
-      <button class="mode-btn active" id="btn-mode1" onclick="setMode(1)">Mode 1 — Liter deduction</button>
-      <button class="mode-btn" id="btn-mode2" onclick="setMode(2)">Mode 2 — Cash fee (LBP)</button>
+      <button class="mode-btn active" id="btn-m1" onclick="setMode(1)">Mode 1 — Liter deduction</button>
+      <button class="mode-btn" id="btn-m2" onclick="setMode(2)">Mode 2 — Cash fee (LBP)</button>
     </div>
-    <div id="mode1-settings" class="form-row">
-      <div class="form-group">
+    <div id="s-m1" class="form-row">
+      <div class="fg">
         <label>Liters deducted per 20L voucher</label>
         <input type="number" id="deduct-lt" value="1" step="0.5" min="0" max="5" oninput="recalc()">
-        <span style="font-size:11px;color:var(--text3);margin-top:2px">Default: 1L per 20L → you get 19L</span>
+        <span class="hint">Default 1L → you get 19L per 20L voucher</span>
       </div>
     </div>
-    <div id="mode2-settings" class="form-row" style="display:none">
-      <div class="form-group">
+    <div id="s-m2" class="form-row" style="display:none">
+      <div class="fg">
         <label>Cash fee per 20L voucher (LBP)</label>
         <input type="number" id="deduct-lbp" value="50000" step="1000" oninput="recalc()">
-        <span style="font-size:11px;color:var(--text3);margin-top:2px">Station fills equivalent liters of (price − fee)</span>
+        <span class="hint">Station fills equivalent liters of (price − fee)</span>
       </div>
     </div>
   </div>
 
   <div class="info-box" id="info-box"></div>
 
-  <div class="section-title">Per voucher type</div>
+  <!-- Main table -->
+  <div class="section-title">Liters breakdown — what you get & what it costs</div>
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Voucher</th><th>Nominal (L)</th><th>Actual (L)</th>
-        <th>Deduction</th><th>Value (LBP)</th><th>Cost/liter (LBP)</th>
-      </tr></thead>
-      <tbody id="voucher-table"></tbody>
-    </table>
-  </div>
-
-  <div class="section-title">Breakdown — 10L to 100L</div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr>
-        <th>Liters</th><th>Actual (L)</th>
-        <th>Deduction</th><th>Value (LBP)</th><th>Cost/liter (LBP)</th>
+        <th>Liters</th>
+        <th>Actual liters received</th>
+        <th>Deduction</th>
+        <th>Value in LBP</th>
+        <th>Cost per actual liter</th>
       </tr></thead>
       <tbody id="main-table"></tbody>
     </table>
@@ -163,109 +143,78 @@ tr:hover td{background:var(--surface2)}
 </div>
 
 <script>
-const LS_CALC='fuel_calc_v2';
-let mode=1;
-let autoFetched=false;
-
+const LS='fuel_calc_v3';
+let mode=1, autoFetched=false;
 const fmt=n=>Math.round(n).toLocaleString();
 const fmtLt=n=>(+n).toFixed(1);
 
 function setMode(m){
   mode=m;
-  document.getElementById('btn-mode1').classList.toggle('active',m===1);
-  document.getElementById('btn-mode2').classList.toggle('active',m===2);
-  document.getElementById('mode1-settings').style.display=m===1?'':'none';
-  document.getElementById('mode2-settings').style.display=m===2?'':'none';
-  recalc(); saveSettings();
+  document.getElementById('btn-m1').classList.toggle('active',m===1);
+  document.getElementById('btn-m2').classList.toggle('active',m===2);
+  document.getElementById('s-m1').style.display=m===1?'':'none';
+  document.getElementById('s-m2').style.display=m===2?'':'none';
+  recalc(); save();
 }
 
-function getActualLiters(nominal){
-  const price20=parseFloat(document.getElementById('price20').value)||2350000;
-  const priceLt=price20/20;
-  if(mode===1){
-    const d=parseFloat(document.getElementById('deduct-lt').value)||1;
-    return nominal-(d/20)*nominal;
-  } else {
-    const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;
-    const feeScaled=fee*(nominal/20);
-    return (nominal*priceLt-feeScaled)/priceLt;
-  }
+function actualLiters(nom){
+  const p=parseFloat(document.getElementById('price20').value)||2350000;
+  if(mode===1){const d=parseFloat(document.getElementById('deduct-lt').value)||1;return nom-(d/20)*nom;}
+  else{const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;return (nom*p/20-fee*(nom/20))/(p/20);}
 }
 
-function getDeductDisplay(nominal){
-  const price20=parseFloat(document.getElementById('price20').value)||2350000;
-  if(mode===1){
-    const d=parseFloat(document.getElementById('deduct-lt').value)||1;
-    return `-${fmtLt((d/20)*nominal)} L`;
-  } else {
-    const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;
-    return `-${fmt(fee*(nominal/20))} LBP`;
-  }
+function deductDisplay(nom){
+  const p=parseFloat(document.getElementById('price20').value)||2350000;
+  if(mode===1){const d=parseFloat(document.getElementById('deduct-lt').value)||1;return `-${fmtLt((d/20)*nom)} L`;}
+  else{const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;return `-${fmt(fee*(nom/20))} LBP`;}
 }
 
-function onPriceInput(){
+function onManual(){
   autoFetched=false;
   document.getElementById('price-hint').textContent='Manually overridden';
   document.getElementById('pdot').className='pdot stale';
   document.getElementById('pstatus').textContent='Price manually set';
-  recalc(); saveSettings();
+  recalc(); save();
 }
 
 function recalc(){
-  const price20=parseFloat(document.getElementById('price20').value)||2350000;
-  const priceLt=price20/20;
-  const actual20=getActualLiters(20);
-  const effLt=price20/actual20;
+  const p=parseFloat(document.getElementById('price20').value)||2350000;
+  const plt=p/20;
+  const act20=actualLiters(20);
+  const eff=p/act20;
 
-  document.getElementById('hero-price20').textContent=fmt(price20);
-  document.getElementById('hero-pricelt').textContent=fmt(priceLt);
-  document.getElementById('hero-effective').textContent=fmt(effLt);
+  document.getElementById('h-p20').textContent=fmt(p);
+  document.getElementById('h-plt').textContent=fmt(plt);
+  document.getElementById('h-eff').textContent=fmt(eff);
 
-  const actual20L=getActualLiters(20);
-  const deductTxt=mode===1
-    ? `${document.getElementById('deduct-lt').value}L taken per 20L → you get <strong>${fmtLt(actual20L)}L</strong> actual`
-    : `${fmt(parseFloat(document.getElementById('deduct-lbp').value)||0)} LBP fee per 20L → station fills <strong>${fmtLt(actual20L)}L</strong>`;
-  document.getElementById('info-box').className=`info-box mode${mode}`;
-  document.getElementById('info-box').innerHTML=`<strong>Mode ${mode}:</strong> ${deductTxt}. Effective cost per actual liter: <strong>${fmt(effLt)} LBP</strong>.`;
+  const act20L=actualLiters(20);
+  const dedTxt=mode===1
+    ?`${document.getElementById('deduct-lt').value}L taken per 20L → you get <strong>${fmtLt(act20L)}L</strong> actual`
+    :`${fmt(parseFloat(document.getElementById('deduct-lbp').value)||0)} LBP fee per 20L → station fills <strong>${fmtLt(act20L)}L</strong>`;
+  document.getElementById('info-box').className=`info-box m${mode}`;
+  document.getElementById('info-box').innerHTML=`<strong>Mode ${mode}:</strong> ${dedTxt}. Effective cost: <strong>${fmt(eff)} LBP/L</strong>.`;
 
-  // Voucher table
-  const vouchers=[{l:'10L',c:'v10',n:10},{l:'20L',c:'v20',n:20},{l:'30L',c:'v30',n:30}];
-  document.getElementById('voucher-table').innerHTML=vouchers.map(v=>{
-    const act=getActualLiters(v.n);
-    const val=act*priceLt;
-    const cpl=(price20*(v.n/20))/act;
-    return `<tr>
-      <td><span class="badge-v ${v.c}">${v.l} voucher</span></td>
-      <td>${v.n} L</td><td class="green-val">${fmtLt(act)} L</td>
-      <td class="red-val">${getDeductDisplay(v.n)}</td>
-      <td>${fmt(val)} LBP</td><td>${fmt(cpl)} LBP</td>
-    </tr>`;
-  }).join('');
-
-  // Main table - simple 10 to 100L
-  const rows=[];
+  // Table: 10 to 100 in steps of 10
+  let rows='';
   for(let nom=10;nom<=100;nom+=10){
-    const act=getActualLiters(nom);
-    const val=act*priceLt;
-    const cpl=act>0?(nom*priceLt)/act:0;
-    let ded;
-    if(mode===1){const d=parseFloat(document.getElementById('deduct-lt').value)||1;ded=`-${fmtLt((d/20)*nom)} L`;}
-    else{const fee=parseFloat(document.getElementById('deduct-lbp').value)||0;ded=`-${fmt(fee*(nom/20))} LBP`;}
-    rows.push(`<tr>
-      <td><strong>${nom} L</strong></td>
-      <td class="green-val">${fmtLt(act)} L</td>
-      <td class="red-val">${ded}</td>
+    const act=actualLiters(nom);
+    const val=act*plt;
+    const cpl=val/act;
+    const bold=nom%20===0?'bold':'';
+    rows+=`<tr class="${bold}">
+      <td>${nom} L</td>
+      <td class="green">${fmtLt(act)} L</td>
+      <td class="red">${deductDisplay(nom)}</td>
       <td>${fmt(val)} LBP</td>
-      <td>${fmt(cpl)} LBP</td>
-    </tr>`);
+      <td>${fmt(cpl)} LBP/L</td>
+    </tr>`;
   }
-  document.getElementById('main-table').innerHTML=rows.join('');
+  document.getElementById('main-table').innerHTML=rows;
 }
 
-function saveSettings(){
-  try{localStorage.setItem(LS_CALC,JSON.stringify({
-    price20:document.getElementById('price20').value,
-    mode,
+function save(){
+  try{localStorage.setItem(LS,JSON.stringify({
+    price20:document.getElementById('price20').value,mode,
     deductLt:document.getElementById('deduct-lt').value,
     deductLbp:document.getElementById('deduct-lbp').value,
     fetchedAt:autoFetched?Date.now():null
@@ -274,60 +223,52 @@ function saveSettings(){
 
 async function fetchPrice(){
   const btn=document.getElementById('fetch-btn');
-  const pdot=document.getElementById('pdot');
-  const pstatus=document.getElementById('pstatus');
   btn.disabled=true; btn.textContent='⏳ Fetching...';
-  pdot.className='pdot loading'; pstatus.textContent='Searching for latest price...';
+  document.getElementById('pdot').className='pdot loading';
+  document.getElementById('pstatus').textContent='Searching for latest price...';
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:300,
+        model:'claude-sonnet-4-6',max_tokens:300,
         tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:'What is the current price of 95 octane gasoline per 20 liters (صفيحة) in Lebanon in LBP today? Search for the latest price from IPT group or TotalEnergies Lebanon or Lebanon Ministry of Energy. Return ONLY a JSON object like: {"price20":2350000,"date":"15 Jun 2026","source":"IPT"} with no other text.'}]
+        messages:[{role:'user',content:'What is the current price of 95 octane gasoline per 20 liters (صفيحة) in Lebanon in LBP today? Return ONLY a JSON object like: {"price20":2350000,"date":"15 Jun 2026","source":"IPT"} with no other text.'}]
       })
     });
     const data=await res.json();
-    let jsonStr='';
-    for(const block of data.content){
-      if(block.type==='text'){jsonStr=block.text;break;}
-    }
-    // extract JSON
-    const match=jsonStr.match(/\{[^}]+\}/);
-    if(match){
-      const parsed=JSON.parse(match[0]);
+    let txt='';
+    for(const b of data.content){if(b.type==='text'){txt=b.text;break;}}
+    const m=txt.match(/\{[^}]+\}/);
+    if(m){
+      const parsed=JSON.parse(m[0]);
       if(parsed.price20&&parsed.price20>1000000){
         document.getElementById('price20').value=parsed.price20;
         autoFetched=true;
-        const hint=`Auto-fetched · ${parsed.date||'today'} · Source: ${parsed.source||'web'}`;
+        const hint=`Auto-fetched · ${parsed.date||'today'} · ${parsed.source||'web'}`;
         document.getElementById('price-hint').textContent=hint;
-        pdot.className='pdot live';
-        pstatus.textContent=hint;
-        recalc(); saveSettings();
+        document.getElementById('pdot').className='pdot live';
+        document.getElementById('pstatus').textContent=hint;
+        recalc(); save();
         btn.textContent='✓ Updated';
-        setTimeout(()=>{btn.textContent='🔄 Refresh price';btn.disabled=false;},2000);
+        setTimeout(()=>{btn.textContent='🔄 Refresh';btn.disabled=false;},2000);
         return;
       }
     }
-    throw new Error('Could not parse price');
+    throw new Error('parse failed');
   }catch(e){
-    pdot.className='pdot stale';
-    pstatus.textContent='Auto-fetch failed — price shown is last saved';
-    btn.textContent='🔄 Retry';
-    btn.disabled=false;
+    document.getElementById('pdot').className='pdot stale';
+    document.getElementById('pstatus').textContent='Auto-fetch failed — using last saved price';
+    btn.textContent='🔄 Retry'; btn.disabled=false;
   }
 }
 
 // Load saved settings
 try{
-  const s=JSON.parse(localStorage.getItem(LS_CALC)||'{}');
-  if(s.price20){document.getElementById('price20').value=s.price20;}
-  if(s.deductLt){document.getElementById('deduct-lt').value=s.deductLt;}
-  if(s.deductLbp){document.getElementById('deduct-lbp').value=s.deductLbp;}
-  if(s.mode){mode=s.mode;setMode(s.mode);}
-  // if last fetch was recent (< 6 hours), skip auto-fetch
+  const s=JSON.parse(localStorage.getItem(LS)||'{}');
+  if(s.price20) document.getElementById('price20').value=s.price20;
+  if(s.deductLt) document.getElementById('deduct-lt').value=s.deductLt;
+  if(s.deductLbp) document.getElementById('deduct-lbp').value=s.deductLbp;
+  if(s.mode) setMode(s.mode);
   if(s.fetchedAt&&(Date.now()-s.fetchedAt)<6*3600*1000){
     autoFetched=true;
     const d=new Date(s.fetchedAt);
@@ -336,10 +277,7 @@ try{
     document.getElementById('pdot').className='pdot live';
     document.getElementById('pstatus').textContent=hint;
     recalc();
-  } else {
-    recalc();
-    fetchPrice(); // auto-fetch on load
-  }
+  } else { recalc(); fetchPrice(); }
 }catch(e){recalc();fetchPrice();}
 </script>
 </body>

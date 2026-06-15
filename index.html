@@ -551,7 +551,7 @@ function refreshPersonList(){const dl=document.getElementById('persons-list');if
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 // ── Metrics ──
-function renderMetrics(){console.log('renderMetrics called, entries count:', entries.length, 'stock:', JSON.stringify(calcStock()));
+function renderMetrics(){
   const{s10,s20,s30}=calcStock();
   const{recv,car,gift,sale}=calcTotals();
   const stockLt=toLt(s10,s20,s30);

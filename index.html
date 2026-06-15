@@ -655,12 +655,9 @@ function onTypeChange(){
   const v30=document.getElementById('inp-v30');
 
   if(t==='تعبئة'){
-    // Auto-fill Nissan
-    if(!person.value||person.value.trim()==='') person.value=NISSAN_PERSON;
-    // Clear vouchers if all zero
-    if((parseInt(v10.value)||0)===0&&(parseInt(v20.value)||0)===0&&(parseInt(v30.value)||0)===0){
-      v10.value=0; v20.value=1; v30.value=1;
-    }
+    // Always set Nissan and reset vouchers
+    person.value=NISSAN_PERSON;
+    v10.value=0; v20.value=0; v30.value=0;
   } else if(t==='استلام'){
     // Default monthly allocation: 5×10L, 9×20L, 9×30L
     if(!person.value||person.value.trim()==='') person.value='الجيش';

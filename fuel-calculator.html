@@ -29,7 +29,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .pdot.loading{background:#fbbf24;animation:blink .6s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .pstatus{font-size:11px;opacity:.7}
-.pupdate{font-size:11px;opacity:.6;background:rgba(255,255,255,.12);padding:2px 8px;border-radius:4px}
+.pupdate{font-size:11px;opacity:.7;background:rgba(255,255,255,.12);padding:2px 8px;border-radius:4px}
 .src-links{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .src-link{font-size:11px;color:rgba(255,255,255,.6);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:3px 8px;border-radius:4px}
 .src-link:hover{color:#fff}
@@ -38,36 +38,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .fetch-btn:disabled{opacity:.5;cursor:not-allowed}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:16px}
 .card-title{font-size:13px;font-weight:600;margin-bottom:12px}
-.modes-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .mode-box{border-radius:var(--rs);padding:14px}
 .mode-box.m1{border:1px solid rgba(133,77,14,.3);background:rgba(245,200,66,.04)}
 .mode-box.m2{border:1px solid rgba(15,110,86,.3);background:rgba(15,110,86,.04)}
-.mode-label{font-size:12px;font-weight:600;margin-bottom:10px}
+.mode-label{font-size:12px;font-weight:700;margin-bottom:10px}
 .mode-label.m1{color:#854d0e}
 .mode-label.m2{color:#0F6E56}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:12px;font-weight:500;color:var(--text2)}
 .fg input{font-size:14px;padding:8px 11px;border:1px solid rgba(0,0,0,.18);border-radius:var(--rs);background:var(--surface2);color:var(--text);width:100%;outline:none}
-.fg input:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,39,68,.1)}
+.fg input:focus{border-color:var(--navy)}
 .fg .hint{font-size:11px;color:var(--text3);margin-top:2px}
-.section-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
-.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);margin-bottom:18px}
+/* Tables */
+.tables-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.tbl-card{background:var(--surface);border-radius:var(--r);overflow:hidden}
+.tbl-card.m2{order:-1}
+.tbl-header{padding:11px 14px;font-size:13px;font-weight:600;color:#fff}
+.tbl-header.m1{background:linear-gradient(90deg,#854d0e,#a36210)}
+.tbl-header.m2{background:linear-gradient(90deg,#0F6E56,#1a9070)}
+.tbl-sub{font-size:11px;font-weight:400;opacity:.8;margin-top:1px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{padding:9px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
-th.center{text-align:center}
-th.m1h{background:rgba(245,200,66,.1);color:#854d0e;border-left:2px solid rgba(245,200,66,.5)}
-th.m2h{background:rgba(15,110,86,.08);color:#0F6E56;border-left:2px solid rgba(15,110,86,.4)}
-th.sep{background:var(--surface2);width:16px;padding:0}
-td{padding:10px 14px;border-bottom:1px solid var(--border);text-align:right;vertical-align:middle}
-td.center{text-align:center;font-weight:700;font-size:15px}
-td.m1b{border-left:2px solid rgba(245,200,66,.3);background:rgba(245,200,66,.02)}
-td.m2b{border-left:2px solid rgba(15,110,86,.25);background:rgba(15,110,86,.02)}
-td.sep{background:var(--surface2);padding:0;width:16px}
+th{padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border);border-top:1px solid var(--border)}
+th:first-child{text-align:center}
+td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:right}
+td:first-child{text-align:center;font-weight:700;font-size:14px;color:var(--text)}
 tr:last-child td{border-bottom:none}
-tr:hover td{filter:brightness(.97)}
+tr:hover td{background:var(--surface2)}
 .green{color:var(--green);font-weight:600}
 .red{color:var(--red);font-size:12px}
-@media(max-width:600px){.modes-row{grid-template-columns:1fr}}
+@media(max-width:640px){.two-col,.tables-wrap{grid-template-columns:1fr}.tbl-card.m2{order:0}}
 </style>
 </head>
 <body>
@@ -106,11 +106,11 @@ tr:hover td{filter:brightness(.97)}
   <div class="card">
     <div class="card-title">⚙️ Settings</div>
     <div class="fg" style="margin-bottom:14px;max-width:320px">
-      <label>Price per صفيحة 20L (LBP) — edit to override auto-fetched</label>
+      <label>Price per صفيحة 20L (LBP)</label>
       <input type="number" id="price20" value="2350000" step="1000" oninput="onManual()">
       <span class="hint" id="price-hint">Auto-fetched on load · edit to override</span>
     </div>
-    <div class="modes-row">
+    <div class="two-col">
       <div class="mode-box m1">
         <div class="mode-label m1">⚡ Mode 1 — Liter deduction</div>
         <div class="fg">
@@ -120,39 +120,53 @@ tr:hover td{filter:brightness(.97)}
         </div>
       </div>
       <div class="mode-box m2">
-        <div class="mode-label m2">💰 Mode 2 — Cash fee (LBP)</div>
+        <div class="mode-label m2">💰 Mode 2 — Cash fee (LBP) · active by default</div>
         <div class="fg">
           <label>Cash fee per 20L voucher (LBP)</label>
-          <input type="number" id="deduct-lbp" value="50000" step="1000" oninput="recalcAndSave()">
-          <span class="hint">e.g. 115,000 → fills fewer liters by that value</span>
+          <input type="number" id="deduct-lbp" value="115000" step="1000" oninput="recalcAndSave()">
+          <span class="hint">Station fills equivalent liters of (price − fee)</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Table -->
-  <div class="section-title">Liters breakdown — Mode 1 vs Mode 2 side by side</div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th class="center" rowspan="2" style="background:var(--surface2)">Liters</th>
-          <th colspan="3" class="m1h" style="text-align:center">⚡ Mode 1 — Liter deduction</th>
-          <th class="sep" rowspan="2"></th>
-          <th colspan="3" class="m2h" style="text-align:center">💰 Mode 2 — Cash fee</th>
-        </tr>
-        <tr>
-          <th class="m1h">Actual (L)</th>
-          <th class="m1h">Deducted (L)</th>
-          <th class="m1h">Value (LBP)</th>
-          <th class="sep"></th>
-          <th class="m2h">Actual (L)</th>
-          <th class="m2h">Fee (LBP)</th>
-          <th class="m2h">Value (LBP)</th>
-        </tr>
-      </thead>
-      <tbody id="main-table"></tbody>
-    </table>
+  <!-- Two tables -->
+  <div class="tables-wrap">
+
+    <!-- Mode 2 (default / left) -->
+    <div class="tbl-card m2">
+      <div class="tbl-header m2">
+        💰 Mode 2 — Cash fee
+        <div class="tbl-sub">Station deducts LBP cash per voucher</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Liters</th>
+          <th>Actual (L)</th>
+          <th>Fee deducted (LBP)</th>
+          <th>Value (LBP)</th>
+        </tr></thead>
+        <tbody id="table-m2"></tbody>
+      </table>
+    </div>
+
+    <!-- Mode 1 (right) -->
+    <div class="tbl-card m1">
+      <div class="tbl-header m1">
+        ⚡ Mode 1 — Liter deduction
+        <div class="tbl-sub">Station takes liters instead of cash</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Liters</th>
+          <th>Actual (L)</th>
+          <th>Liters deducted</th>
+          <th>Value (LBP)</th>
+        </tr></thead>
+        <tbody id="table-m1"></tbody>
+      </table>
+    </div>
+
   </div>
 </div>
 
@@ -160,21 +174,15 @@ tr:hover td{filter:brightness(.97)}
 const LS = 'fuel_calc_v5';
 let autoFetched = false, lastPriceDate = null, lastPriceSource = null;
 
-const fmt = n => Math.round(n).toLocaleString();
+const fmt   = n => Math.round(n).toLocaleString();
 const fmtLt = n => (+n).toFixed(1);
 
 function getP()   { return parseFloat(document.getElementById('price20').value)    || 2350000; }
 function getDLt() { return parseFloat(document.getElementById('deduct-lt').value)  || 1; }
 function getFee() { return parseFloat(document.getElementById('deduct-lbp').value) || 0; }
 
-function actualM1(nom) {
-  return nom - (getDLt() / 20) * nom;
-}
-function actualM2(nom) {
-  const plt = getP() / 20;
-  const fee = getFee() * (nom / 20);
-  return nom - fee / plt;
-}
+function actualM1(nom) { return nom - (getDLt() / 20) * nom; }
+function actualM2(nom) { const plt = getP() / 20; return nom - (getFee() * (nom / 20)) / plt; }
 
 function onManual() {
   autoFetched = false; lastPriceDate = null;
@@ -185,50 +193,43 @@ function onManual() {
   recalcAndSave();
 }
 
-function recalcAndSave() {
-  recalc();
-  save();
-}
+function recalcAndSave() { recalc(); save(); }
 
 function recalc() {
-  const p = getP();
-  const plt = p / 20;
+  const p = getP(), plt = p / 20;
   document.getElementById('h-p20').textContent = fmt(p);
   document.getElementById('h-plt').textContent = fmt(plt);
 
-  let rows = '';
+  let r1 = '', r2 = '';
   for (let nom = 10; nom <= 100; nom += 10) {
-    const a1   = actualM1(nom);
-    const ded1 = (getDLt() / 20) * nom;
-    const val1 = a1 * plt;
+    const a1 = actualM1(nom);
+    const d1 = (getDLt() / 20) * nom;
+    r1 += `<tr>
+      <td>${nom}</td>
+      <td class="green">${fmtLt(a1)} L</td>
+      <td class="red">&minus;${fmtLt(d1)} L</td>
+      <td>${fmt(a1 * plt)}</td>
+    </tr>`;
 
     const a2   = actualM2(nom);
     const fee2 = getFee() * (nom / 20);
-    const val2 = a2 * plt;
-
-    rows += `<tr>
-      <td class="center">${nom}</td>
-      <td class="green m1b">${fmtLt(a1)} L</td>
-      <td class="red">&minus;${fmtLt(ded1)} L</td>
-      <td class="m1b">${fmt(val1)}</td>
-      <td class="sep"></td>
-      <td class="green m2b">${fmtLt(a2)} L</td>
+    r2 += `<tr>
+      <td>${nom}</td>
+      <td class="green">${fmtLt(a2)} L</td>
       <td class="red">&minus;${fmt(fee2)}</td>
-      <td class="m2b">${fmt(val2)}</td>
+      <td>${fmt(a2 * plt)}</td>
     </tr>`;
   }
-  document.getElementById('main-table').innerHTML = rows;
+  document.getElementById('table-m1').innerHTML = r1;
+  document.getElementById('table-m2').innerHTML = r2;
 }
 
 function save() {
   try {
     localStorage.setItem(LS, JSON.stringify({
-      price20:    getP(),
-      deductLt:   getDLt(),
-      deductLbp:  getFee(),
-      fetchedAt:  autoFetched ? Date.now() : null,
-      priceDate:  lastPriceDate,
-      priceSrc:   lastPriceSource
+      price20: getP(), deductLt: getDLt(), deductLbp: getFee(),
+      fetchedAt: autoFetched ? Date.now() : null,
+      priceDate: lastPriceDate, priceSrc: lastPriceSource
     }));
   } catch(e) {}
 }
@@ -238,7 +239,7 @@ function loadSaved() {
     const s = JSON.parse(localStorage.getItem(LS) || '{}');
     if (s.price20)   document.getElementById('price20').value    = s.price20;
     if (s.deductLt)  document.getElementById('deduct-lt').value  = s.deductLt;
-    if (s.deductLbp) document.getElementById('deduct-lbp').value = s.deductLbp;
+    if (s.deductLbp !== undefined) document.getElementById('deduct-lbp').value = s.deductLbp;
     if (s.priceDate) lastPriceDate   = s.priceDate;
     if (s.priceSrc)  lastPriceSource = s.priceSrc;
     return s;
@@ -286,7 +287,7 @@ async function fetchPrice() {
     throw new Error('parse failed');
   } catch(e) {
     document.getElementById('pdot').className = 'pdot stale';
-    document.getElementById('pstatus').textContent = 'Auto-fetch failed — showing last saved';
+    document.getElementById('pstatus').textContent = 'Auto-fetch failed — showing last saved price';
     btn.textContent = '🔄 Retry'; btn.disabled = false;
   }
 }
@@ -294,12 +295,9 @@ async function fetchPrice() {
 // ── Init ──
 const saved = loadSaved();
 recalc();
-
 if (saved.fetchedAt && (Date.now() - saved.fetchedAt) < 6 * 3600 * 1000) {
-  // Recent fetch — skip auto-fetch, show cached status
   autoFetched = true;
-  const hint = `Auto-fetched · ${lastPriceDate || ''} · ${lastPriceSource || 'web'}`;
-  document.getElementById('price-hint').textContent = hint;
+  document.getElementById('price-hint').textContent = `Auto-fetched · ${lastPriceDate || ''} · ${lastPriceSource || ''}`;
   document.getElementById('pdot').className = 'pdot live';
   document.getElementById('pstatus').textContent = `Live · ${lastPriceSource || 'web'}`;
   if (lastPriceDate) {

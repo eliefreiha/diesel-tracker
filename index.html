@@ -4,7 +4,418 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Diesel Voucher Tracker</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+// ══════════════════════════════════════════
+// MAINTENANCE MODULE
+// ══════════════════════════════════════════
+const LS_MAINTENANCE = 'diesel_maintenance_v1';
+const LS_SVC_TYPES   = 'diesel_svc_types_v1';
+let maintenanceEntries = [];
+let editingMaintId = null;
+
+// ── Default service types ──
+const DEFAULT_SVC_TYPES = [
+  {id:'oil',    name:'Oil change',       reminder:{type:'both', km:5000, timeVal:3, timeUnit:'months'}},
+  {id:'filter', name:'Oil filter',       reminder:{type:'km',   km:5000}},
+  {id:'air',    name:'Air filter',       reminder:{type:'km',   km:20000}},
+  {id:'tires',  name:'Tire rotation',    reminder:{type:'both', km:10000, timeVal:6, timeUnit:'months'}},
+  {id:'brakes', name:'Brake inspection', reminder:{type:'km',   km:20000}},
+  {id:'spark',  name:'Spark plugs',      reminder:{type:'km',   km:30000}},
+  {id:'belt',   name:'Timing belt',      reminder:{type:'km',   km:60000}},
+  {id:'coolant',name:'Coolant flush',    reminder:{type:'both', km:40000, timeVal:2, timeUnit:'years'}},
+];
+
+function getServiceTypes(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(LS_SVC_TYPES)||'null');
+    if(saved) return saved;
+  }catch(e){}
+  return DEFAULT_SVC_TYPES.map(t=>({...t}));
+}
+function saveServiceTypes(types){
+  try{localStorage.setItem(LS_SVC_TYPES,JSON.stringify(types));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('svc_types',types);
+}
+function loadMaintenanceEntries(){
+  try{const s=localStorage.getItem(LS_MAINTENANCE);if(s)return JSON.parse(s);}catch(e){}
+  return[];
+}
+function saveMaintenanceLocal(){
+  try{localStorage.setItem(LS_MAINTENANCE,JSON.stringify(maintenanceEntries));}catch(e){}
+}
+
+// ── Supabase maintenance ──
+async function loadMaintenanceFromSupabase(){
+  if(!sbUrl||!sbKey)return;
+  try{
+    const data=await sbFetch('maintenance_entries?order=date_str.desc,id.desc&limit=1000');
+    if(data){
+      maintenanceEntries=data.map(r=>({
+        id:r.id, dateStr:r.date_str, odometer:r.odometer,
+        services:r.services||[], costs:r.costs||{}, notes:r.notes||''
+      }));
+      try{localStorage.setItem(LS_MAINTENANCE,JSON.stringify(maintenanceEntries));}catch(e){}
+    }
+  }catch(e){console.warn('maintenance load failed',e);}
+}
+async function sbInsertMaintenance(entry){
+  if(!sbUrl||!sbKey)return entry;
+  const body={date_str:entry.dateStr,odometer:entry.odometer,services:entry.services,costs:entry.costs,notes:entry.notes||null};
+  try{
+    const data=await sbFetch('maintenance_entries',{method:'POST',body:JSON.stringify(body)});
+    if(data&&data[0]) return{...entry,id:data[0].id};
+  }catch(e){console.warn('maint insert failed',e);}
+  return entry;
+}
+async function sbUpdateMaintenance(entry){
+  if(!sbUrl||!sbKey)return;
+  const body={date_str:entry.dateStr,odometer:entry.odometer,services:entry.services,costs:entry.costs,notes:entry.notes||null};
+  try{await sbFetch(`maintenance_entries?id=eq.${entry.id}`,{method:'PATCH',body:JSON.stringify(body)});}catch(e){}
+}
+async function sbDeleteMaintenance(id){
+  if(!sbUrl||!sbKey)return;
+  try{await sbFetch(`maintenance_entries?id=eq.${id}`,{method:'DELETE'});}catch(e){}
+}
+
+// ── Reminder calculation ──
+function getLastService(svcId){
+  for(const e of maintenanceEntries){
+    if(e.services&&e.services.includes(svcId)) return e;
+  }
+  return null;
+}
+function getLastNissanOdoFromEntries(){
+  const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer)
+    .sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+  return fills.length?fills[0].odometer:0;
+}
+function calcReminder(svcType){
+  const last=getLastService(svcType.id);
+  if(!last||!svcType.reminder||svcType.reminder.type==='none') return null;
+  const r=svcType.reminder;
+  const currentOdo=getLastNissanOdoFromEntries();
+  const today=new Date();
+  const lastDate=new Date(last.dateStr);
+  const results=[];
+
+  if((r.type==='km'||r.type==='both')&&last.odometer&&r.km){
+    const nextOdo=last.odometer+r.km;
+    const remaining=nextOdo-currentOdo;
+    results.push({type:'km',next:nextOdo,remaining,overdue:remaining<=0});
+  }
+  if((r.type==='days'||r.type==='months'||r.type==='years'||r.type==='both')&&r.timeVal&&r.timeUnit){
+    const nextDate=new Date(lastDate);
+    if(r.timeUnit==='days') nextDate.setDate(nextDate.getDate()+r.timeVal);
+    else if(r.timeUnit==='months') nextDate.setMonth(nextDate.getMonth()+r.timeVal);
+    else if(r.timeUnit==='years') nextDate.setFullYear(nextDate.getFullYear()+r.timeVal);
+    const daysLeft=Math.round((nextDate-today)/(1000*60*60*24));
+    results.push({type:'time',nextDate,daysLeft,overdue:daysLeft<0});
+  }
+  return results.length?results:null;
+}
+
+// ── Render reminders ──
+function renderMaintenanceReminders(){
+  const types=getServiceTypes();
+  const reminders=[];
+  types.forEach(t=>{
+    const r=calcReminder(t);
+    if(!r) return;
+    r.forEach(ri=>{
+      reminders.push({name:t.name,reminder:ri,overdue:ri.overdue});
+    });
+  });
+  reminders.sort((a,b)=>(a.overdue?-1:1)-(b.overdue?-1:1));
+  const el=document.getElementById('maintenance-reminders');
+  if(!el) return;
+  if(!reminders.length){el.innerHTML='';return;}
+  const overdueList=reminders.filter(r=>r.overdue);
+  const upcomingList=reminders.filter(r=>!r.overdue&&(
+    (r.reminder.type==='km'&&r.reminder.remaining<2000)||
+    (r.reminder.type==='time'&&r.reminder.daysLeft<30)
+  ));
+  let html2='';
+  if(overdueList.length){
+    html2+=`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r);padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:8px">⚠️ Overdue (${overdueList.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${overdueList.map(r=>`<span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500">
+        ${r.name} · ${r.reminder.type==='km'?`${Math.abs(r.reminder.remaining).toLocaleString()}km overdue`:`${Math.abs(r.reminder.daysLeft)}d overdue`}
+      </span>`).join('')}
+      </div></div>`;
+  }
+  if(upcomingList.length){
+    html2+=`<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:var(--r);padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:600;color:#854d0e;margin-bottom:8px">⏰ Due soon (${upcomingList.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${upcomingList.map(r=>`<span style="background:#fef9c3;color:#854d0e;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500">
+        ${r.name} · ${r.reminder.type==='km'?`${r.reminder.remaining.toLocaleString()}km left`:`${r.reminder.daysLeft}d left`}
+      </span>`).join('')}
+      </div></div>`;
+  }
+  el.innerHTML=html2;
+}
+
+// ── Render metrics ──
+function renderMaintenanceMetrics(){
+  const el=document.getElementById('maintenance-metrics');
+  if(!el) return;
+  const total=maintenanceEntries.length;
+  const totalCost=maintenanceEntries.reduce((s,e)=>s+Object.values(e.costs||{}).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
+  const lastEntry=maintenanceEntries[0];
+  const currentOdo=getLastNissanOdoFromEntries();
+  const sinceLastService=lastEntry&&lastEntry.odometer?(currentOdo-lastEntry.odometer):null;
+  el.innerHTML=`
+    <div class="metric"><div class="metric-label">Service visits</div><div class="metric-val">${total}</div></div>
+    <div class="metric"><div class="metric-label">Total spent</div><div class="metric-val" style="font-size:15px">${Math.round(totalCost).toLocaleString()}</div><div class="metric-sub">LBP</div></div>
+    <div class="metric"><div class="metric-label">Last service</div><div class="metric-val" style="font-size:15px">${lastEntry?fmtDate(lastEntry.dateStr):'—'}</div></div>
+    <div class="metric ${sinceLastService>5000?'accent':''}"><div class="metric-label">Since last service</div><div class="metric-val">${sinceLastService!=null?sinceLastService.toLocaleString():'—'}</div><div class="metric-sub">km</div></div>`;
+}
+
+// ── Render service log ──
+function renderMaintenanceLog(){
+  const types=getServiceTypes();
+  const nameMap={};
+  types.forEach(t=>nameMap[t.id]=t.name);
+  const el=document.getElementById('maintenance-body');
+  if(!el) return;
+  if(!maintenanceEntries.length){
+    el.innerHTML='<tr><td colspan="6"><div class="empty-state">No service visits yet.</div></td></tr>';
+    return;
+  }
+  el.innerHTML=maintenanceEntries.map(e=>{
+    const totalCost=Object.values(e.costs||{}).reduce((a,b)=>a+(parseFloat(b)||0),0);
+    const svcNames=(e.services||[]).map(id=>nameMap[id]||id);
+    return`<tr>
+      <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
+      <td class="tr" style="font-weight:600">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:4px">${svcNames.map(n=>`<span style="background:var(--surface2);border:1px solid var(--border);padding:2px 8px;border-radius:20px;font-size:11px;color:var(--text2)">${n}</span>`).join('')}</div></td>
+      <td class="tr" style="font-weight:600">${totalCost?Math.round(totalCost).toLocaleString():''}</td>
+      <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
+      <td><button class="btn-edit" onclick="openMaintenanceEdit(${e.id})">✏️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Render service types settings ──
+function renderServiceTypesList(){
+  const types=getServiceTypes();
+  const el=document.getElementById('service-types-list');
+  if(!el) return;
+  // Update reminder reminder-type visibility
+  const rtSel=document.getElementById('new-svc-reminder-type');
+  if(rtSel) updateSvcReminderVisibility(rtSel.value);
+
+  if(!types.length){el.innerHTML='<p style="font-size:13px;color:var(--text3);margin-bottom:10px">No service types yet.</p>';return;}
+  el.innerHTML=types.map(t=>{
+    const r=t.reminder;
+    let reminderTxt='No reminder';
+    if(r&&r.type!=='none'){
+      const parts=[];
+      if((r.type==='km'||r.type==='both')&&r.km) parts.push(`every ${r.km.toLocaleString()} km`);
+      if((r.type==='days'||r.type==='months'||r.type==='years'||r.type==='both')&&r.timeVal) parts.push(`every ${r.timeVal} ${r.timeUnit}`);
+      reminderTxt=parts.join(' + ');
+    }
+    const last=getLastService(t.id);
+    const rem=calcReminder(t);
+    let statusHtml='';
+    if(rem){
+      rem.forEach(ri=>{
+        if(ri.overdue) statusHtml+=`<span style="color:var(--red);font-size:11px">⚠ Overdue</span> `;
+        else if(ri.type==='km'&&ri.remaining<2000) statusHtml+=`<span style="color:#854d0e;font-size:11px">⏰ ${ri.remaining.toLocaleString()}km left</span> `;
+        else if(ri.type==='time'&&ri.daysLeft<30) statusHtml+=`<span style="color:#854d0e;font-size:11px">⏰ ${ri.daysLeft}d left</span> `;
+      });
+    }
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <span style="font-size:14px;font-weight:500;min-width:140px">${t.name}</span>
+      <span style="font-size:11px;color:var(--text3);flex:1">${reminderTxt}</span>
+      ${statusHtml}
+      ${last?`<span style="font-size:11px;color:var(--text2)">Last: ${fmtDate(last.dateStr)}</span>`:''}
+      <button class="btn-del" onclick="removeServiceType('${t.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function updateSvcReminderVisibility(val){
+  const km=document.getElementById('new-svc-km-wrap');
+  const ti=document.getElementById('new-svc-time-wrap');
+  if(km) km.style.display=(val==='km'||val==='both')?'':'none';
+  if(ti) ti.style.display=(val==='days'||val==='months'||val==='years'||val==='both')?'':'none';
+}
+
+function addServiceType(){
+  const name=document.getElementById('new-svc-name').value.trim();
+  if(!name){alert('Please enter a service name');return;}
+  const rType=document.getElementById('new-svc-reminder-type').value;
+  const reminder={type:rType};
+  if(rType==='km'||rType==='both') reminder.km=parseInt(document.getElementById('new-svc-km').value)||0;
+  if(rType==='days'||rType==='months'||rType==='years'||rType==='both'){
+    reminder.timeVal=parseInt(document.getElementById('new-svc-time-val').value)||0;
+    reminder.timeUnit=document.getElementById('new-svc-time-unit').value;
+  }
+  const types=getServiceTypes();
+  const id='svc_'+Date.now();
+  types.push({id,name,reminder});
+  saveServiceTypes(types);
+  document.getElementById('new-svc-name').value='';
+  renderServiceTypesList();
+  toast('Service type added ✓');
+}
+function removeServiceType(id){
+  if(!confirm('Remove this service type?'))return;
+  const types=getServiceTypes().filter(t=>t.id!==id);
+  saveServiceTypes(types);
+  renderServiceTypesList();
+  toast('Removed');
+}
+
+// ── Panel open/close ──
+let _editingMaintId=null;
+function openMaintenancePanel(){
+  _editingMaintId=null;
+  document.getElementById('maint-panel-title').textContent='New service visit';
+  document.getElementById('maint-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('maint-odo').value=getLastNissanOdoFromEntries()||'';
+  document.getElementById('maint-notes').value='';
+  document.getElementById('maint-delete-btn').style.display='none';
+  buildServiceChecklist([],{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function openMaintenanceEdit(id){
+  const e=maintenanceEntries.find(x=>x.id===id);
+  if(!e) return;
+  _editingMaintId=id;
+  document.getElementById('maint-panel-title').textContent='Edit service visit';
+  document.getElementById('maint-date').value=e.dateStr;
+  document.getElementById('maint-odo').value=e.odometer||'';
+  document.getElementById('maint-notes').value=e.notes||'';
+  document.getElementById('maint-delete-btn').style.display='inline-flex';
+  buildServiceChecklist(e.services||[],e.costs||{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function buildServiceChecklist(selected,costs){
+  const types=getServiceTypes();
+  const checklist=document.getElementById('maint-services-checklist');
+  const costsEl=document.getElementById('maint-costs');
+  if(!checklist) return;
+  checklist.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+    ${types.map(t=>`
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:${selected.includes(t.id)?'#dbeafe':'var(--surface2)'};border:1px solid ${selected.includes(t.id)?'#93c5fd':'var(--border)'};padding:6px 12px;border-radius:20px;font-size:13px;transition:all .15s">
+        <input type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''} style="display:none" onchange="updateServiceCosts()">
+        ${t.name}
+      </label>`).join('')}
+  </div>`;
+  updateServiceCosts(costs);
+}
+function updateServiceCosts(initialCosts){
+  const types=getServiceTypes();
+  const nameMap={};types.forEach(t=>nameMap[t.id]=t.name);
+  const checked=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  // Update label styles
+  document.querySelectorAll('#maint-services-checklist label').forEach(lbl=>{
+    const cb=lbl.querySelector('input');
+    const isChk=cb.checked;
+    lbl.style.background=isChk?'#dbeafe':'var(--surface2)';
+    lbl.style.borderColor=isChk?'#93c5fd':'var(--border)';
+  });
+  const costsEl=document.getElementById('maint-costs');
+  if(!costsEl) return;
+  if(!checked.length){costsEl.innerHTML='';updateTotalCost();return;}
+  costsEl.innerHTML=`<div class="section-title" style="margin-bottom:8px">Cost per service (LBP)</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+    ${checked.map(id=>`
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;flex:1">${nameMap[id]||id}</span>
+        <input type="number" id="cost-${id}" value="${initialCosts&&initialCosts[id]||''}" placeholder="0" min="0" step="1000"
+          style="width:140px;font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"
+          oninput="updateTotalCost()">
+        <span style="font-size:12px;color:var(--text3)">LBP</span>
+      </div>`).join('')}
+    </div>`;
+  updateTotalCost();
+}
+function updateTotalCost(){
+  const inputs=[...document.querySelectorAll('[id^="cost-"]')];
+  const total=inputs.reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+  const el=document.getElementById('maint-total-cost');
+  if(el) el.textContent=Math.round(total).toLocaleString()+' LBP';
+}
+async function saveMaintenanceEntry(){
+  const dateStr=document.getElementById('maint-date').value;
+  const odometer=parseInt(document.getElementById('maint-odo').value)||null;
+  const notes=document.getElementById('maint-notes').value.trim();
+  if(!dateStr){alert('Please select a date');return;}
+  const services=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  if(!services.length){alert('Please select at least one service');return;}
+  const costs={};
+  services.forEach(id=>{
+    const el=document.getElementById('cost-'+id);
+    if(el&&el.value) costs[id]=parseFloat(el.value)||0;
+  });
+  if(_editingMaintId){
+    const e=maintenanceEntries.find(x=>x.id===_editingMaintId);
+    if(e){e.dateStr=dateStr;e.odometer=odometer;e.services=services;e.costs=costs;e.notes=notes;}
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) await sbUpdateMaintenance(maintenanceEntries.find(x=>x.id===_editingMaintId));
+    toast('Service visit updated ✓');
+  } else {
+    let entry={id:Date.now(),dateStr,odometer,services,costs,notes};
+    maintenanceEntries.unshift(entry);
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) entry=await sbInsertMaintenance(entry);
+    toast('Service visit saved ✓');
+  }
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+}
+async function deleteMaintenanceEntry(){
+  if(!confirm('Delete this service visit?'))return;
+  if(sbUrl&&sbKey) await sbDeleteMaintenance(_editingMaintId);
+  maintenanceEntries=maintenanceEntries.filter(e=>e.id!==_editingMaintId);
+  saveMaintenanceLocal();
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+  toast('Deleted');
+}
+function renderMaintenancePage(){
+  renderMaintenanceReminders();
+  renderMaintenanceMetrics();
+  renderMaintenanceLog();
+  renderServiceTypesList();
+}
+
+// Hook into showPage
+const _origShowPageMaint=showPage;
+function showPage(name,btn){
+  _origShowPageMaint(name,btn);
+  if(name==='maintenance') renderMaintenancePage();
+}
+
+// Load on init
+maintenanceEntries=loadMaintenanceEntries();
+
+// Load from Supabase
+const _origLoadSB=loadSettingsFromSupabase;
+async function loadSettingsFromSupabase(){
+  await _origLoadSB();
+  await loadMaintenanceFromSupabase();
+  const svcTypes=await sbGetSetting('svc_types');
+  if(svcTypes&&Array.isArray(svcTypes)){
+    try{localStorage.setItem(LS_SVC_TYPES,JSON.stringify(svcTypes));}catch(e){}
+  }
+}
+
+// reminder type visibility on new svc form
+document.addEventListener('DOMContentLoaded',()=>{
+  const sel=document.getElementById('new-svc-reminder-type');
+  if(sel){
+    sel.addEventListener('change',()=>updateSvcReminderVisibility(sel.value));
+    updateSvcReminderVisibility(sel.value);
+  }
+});
+
+
+</script>
 <style>
 :root{--bg:#f8f8f6;--surface:#fff;--surface2:#f2f1ee;--border:rgba(0,0,0,.1);--border2:rgba(0,0,0,.2);--text:#1a1a18;--text2:#6b6b66;--text3:#9a9a94;--navy:#1A2744;--gold:#F5C842;--green:#0F6E56;--red:#dc2626;--r:10px;--rs:6px}
 @media(prefers-color-scheme:dark){:root{--bg:#18181a;--surface:#222224;--surface2:#2c2c2e;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);--text:#f0f0ec;--text2:#a0a09a;--text3:#6a6a64}}
@@ -158,6 +569,7 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
   <button class="nav-btn" onclick="showPage('nissan',this)">🚗 Nissan</button>
   <button class="nav-btn" onclick="showPage('stats',this)">📊 Stats</button>
   <button class="nav-btn" onclick="showPage('settings',this)">⚙️ Settings</button>
+  <button class="nav-btn" onclick="showPage('maintenance',this)">🔧 Service</button>
 </nav>
 
 <!-- LOG -->
@@ -410,6 +822,106 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="bulkUpdateActualLt()">🔄 Recalculate actual liters for all Nissan fills</button>
       <span id="bulk-update-msg" style="font-size:13px;color:var(--text2)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE PAGE -->
+<div id="page-maintenance" class="page">
+
+  <!-- Reminders bar -->
+  <div id="maintenance-reminders" style="margin-bottom:14px"></div>
+
+  <!-- Stats row -->
+  <div class="metrics" id="maintenance-metrics"></div>
+
+  <!-- Add service visit button -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div class="section-title" style="margin-bottom:0">Service history</div>
+    <button class="btn btn-primary btn-sm" onclick="openMaintenancePanel()">+ Add service visit</button>
+  </div>
+
+  <!-- Service log table -->
+  <div class="table-wrap" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+    <table>
+      <thead><tr>
+        <th>Date</th>
+        <th class="tr">Odometer</th>
+        <th>Services done</th>
+        <th class="tr">Total cost (LBP)</th>
+        <th>Notes</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="maintenance-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Service types management -->
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:12px">Service types & reminders</div>
+    <div id="service-types-list"></div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+      <div class="section-title" style="margin-bottom:10px">Add new service type</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Service name</label><input type="text" id="new-svc-name" placeholder="e.g. Oil change"></div>
+        <div class="form-group"><label>Reminder interval</label>
+          <select id="new-svc-reminder-type">
+            <option value="none">No reminder</option>
+            <option value="km">By odometer (km)</option>
+            <option value="days">By days</option>
+            <option value="months">By months</option>
+            <option value="both">Both km & time</option>
+          </select>
+        </div>
+        <div class="form-group" id="new-svc-km-wrap">
+          <label>Every (km)</label>
+          <input type="number" id="new-svc-km" placeholder="e.g. 5000" min="0" step="500">
+        </div>
+        <div class="form-group" id="new-svc-time-wrap">
+          <label>Every</label>
+          <div style="display:flex;gap:6px">
+            <input type="number" id="new-svc-time-val" placeholder="e.g. 3" min="1" style="flex:1">
+            <select id="new-svc-time-unit" style="width:100px">
+              <option value="days">days</option>
+              <option value="months" selected>months</option>
+              <option value="years">years</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addServiceType()">Add service type</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE PANEL -->
+<div class="modal-bg" id="maintenance-panel-bg">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">
+      <span id="maint-panel-title">New service visit</span>
+      <button class="modal-close" onclick="closeModal('maintenance-panel-bg')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Date *</label><input type="date" id="maint-date"></div>
+      <div class="form-group"><label>Odometer (km) *</label><input type="number" id="maint-odo" placeholder="e.g. 222981" min="0" step="1"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px"><label>Notes</label><input type="text" id="maint-notes" placeholder="Optional — workshop, remarks..."></div>
+
+    <div class="section-title" style="margin-bottom:10px">Services performed</div>
+    <div id="maint-services-checklist" style="margin-bottom:12px"></div>
+
+    <!-- Cost per service -->
+    <div id="maint-costs" style="margin-bottom:12px"></div>
+
+    <div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="color:var(--text2)">Total cost</span>
+      <strong id="maint-total-cost">0 LBP</strong>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="saveMaintenanceEntry()">Save</button>
+      <button class="btn" onclick="closeModal('maintenance-panel-bg')">Cancel</button>
+      <button class="btn btn-sm" style="margin-left:auto;color:var(--red);border-color:transparent" id="maint-delete-btn" onclick="deleteMaintenanceEntry()" style="display:none">Delete</button>
     </div>
   </div>
 </div>

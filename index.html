@@ -1384,6 +1384,8 @@ function renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base){
   document.getElementById('nissan-body').innerHTML=filtered.map(e=>{
     const nom=toLt(e.v10,e.v20,e.v30);
     const act=effectiveLt(e);
+    const isFull=e.fullFill!==false;
+    const accum=accumMap?accumMap[e.id]:null;
     return`<tr>
       <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
       <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v10||''}</td>
@@ -1391,9 +1393,10 @@ function renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base){
       <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v30||''}</td>
       <td style="text-align:right;font-weight:600">${nom}</td>
       <td style="text-align:right;color:var(--green);font-weight:600">${act.toFixed(1)}</td>
+      <td style="text-align:center"><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:${isFull?'#dbeafe':'#fef9c3'};color:${isFull?'#1e40af':'#854d0e'};font-weight:500">${isFull?'🔵 Full':'🟡 Partial'}</span></td>
       <td style="text-align:right">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
       <td style="text-align:right;color:var(--green);font-weight:${distMap[e.id]?'600':'400'}">${distMap[e.id]?distMap[e.id].toLocaleString()+' km':'—'}</td>
-      <td style="text-align:right;color:var(--navy);font-weight:600">${effMap[e.id]||'—'}</td>
+      <td style="text-align:right;color:var(--navy);font-weight:600">${accum?accum.eff+' <small style="color:var(--text3)">('+accum.lt+'L / '+accum.dist.toLocaleString()+'km)</small>':'—'}</td>
       <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
       <td><button class="btn btn-sm btn-edit" onclick="openEdit(${e.id})">✏️</button></td>
     </tr>`;

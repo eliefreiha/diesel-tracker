@@ -765,7 +765,7 @@ async function loadFromSupabase(){
   try{
     const data=await sbFetch('diesel_entries?order=date_str.asc,id.asc&limit=5000');
     if(data){
-      entries=data.map(r=>({id:r.id,dateStr:r.date_str,type:r.type,person:r.person||'',v10:r.v10||0,v20:r.v20||0,v30:r.v30||0,odometer:r.odometer||null,actualLt:r.actual_lt!=null?parseFloat(r.actual_lt):null,notes:r.notes||''}));
+      entries=data.map(r=>({id:r.id,dateStr:r.date_str,type:r.type,person:r.person||'',v10:r.v10||0,v20:r.v20||0,v30:r.v30||0,odometer:r.odometer||null,actualLt:r.actual_lt!=null?parseFloat(r.actual_lt):null,fullFill:r.full_fill!==false,notes:r.notes||''}));
       nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;
       setConnStatus('online','Connected');
     }
@@ -774,14 +774,14 @@ async function loadFromSupabase(){
 
 async function sbInsert(entry){
   if(!sbUrl||!sbKey)return entry;
-  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt!==undefined?entry.actualLt:null,notes:entry.notes||null};
+  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt!==undefined?entry.actualLt:null,full_fill:entry.fullFill!==undefined?entry.fullFill:true,notes:entry.notes||null};
   const data=await sbFetch('diesel_entries',{method:'POST',body:JSON.stringify(body)});
   return data?{...entry,id:data[0].id}:entry;
 }
 
 async function sbUpdate(entry){
   if(!sbUrl||!sbKey)return;
-  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt!==undefined?entry.actualLt:null,notes:entry.notes||null};
+  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt!==undefined?entry.actualLt:null,full_fill:entry.fullFill!==undefined?entry.fullFill:true,notes:entry.notes||null};
   await sbFetch(`diesel_entries?id=eq.${entry.id}`,{method:'PATCH',body:JSON.stringify(body)});
 }
 
@@ -1161,9 +1161,10 @@ async function addEntry(){
   const odometer=isNissan(person)&&type==='تعبئة'?(parseInt(document.getElementById('inp-odo').value)||null):null;
   const _altVal=document.getElementById('inp-actual-lt').value;
   const actualLt=isNissan(person)&&type==='تعبئة'?(_altVal!==''&&!isNaN(parseFloat(_altVal))?parseFloat(_altVal):null):null;
+  const fullFill=isNissan(person)&&type==='تعبئة'?(document.getElementById('inp-full-fill')?.checked!==false):null;
   if(!dateStr){alert('Please select a date.');return;}
   if(v10===0&&v20===0&&v30===0){alert('Enter at least one voucher.');return;}
-  let entry={id:nextId++,dateStr,type,person,v10,v20,v30,odometer,actualLt,notes};
+  let entry={id:nextId++,dateStr,type,person,v10,v20,v30,odometer,actualLt,fullFill,notes};
   entries.push(entry);
   localSave();
   if(sbUrl&&sbKey){
@@ -1192,6 +1193,7 @@ function openEdit(id){
   document.getElementById('edit-v30').value=e.v30||0;
   document.getElementById('edit-odo').value=e.odometer||'';
   document.getElementById('edit-actual-lt').value=e.actualLt||'';
+  if(document.getElementById('edit-full-fill')) document.getElementById('edit-full-fill').checked=e.fullFill!==false;
   document.getElementById('edit-notes').value=e.notes||'';
   document.getElementById('edit-odo-section').classList.toggle('hidden',!(isNissan(e.person)&&e.type==='تعبئة'));
   document.getElementById('edit-modal').classList.add('open');
@@ -1209,6 +1211,7 @@ async function saveEdit(){
   e.odometer=isNissan(e.person)&&e.type==='تعبئة'?(parseInt(document.getElementById('edit-odo').value)||null):null;
   const _ealtVal=document.getElementById('edit-actual-lt').value;
   e.actualLt=isNissan(e.person)&&e.type==='تعبئة'?(_ealtVal!==''&&!isNaN(parseFloat(_ealtVal))?parseFloat(_ealtVal):null):null;
+  e.fullFill=isNissan(e.person)&&e.type==='تعبئة'?(document.getElementById('edit-full-fill')?.checked!==false):null;
   e.notes=document.getElementById('edit-notes').value.trim();
   localSave();
   if(sbUrl&&sbKey){try{await sbUpdate(e);}catch(err){toast('⚠ Saved locally, sync failed');}}
@@ -1239,67 +1242,102 @@ function renderNissan(){
   const deductPer20=getNissanDeduct();
   const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
 
-  // Effective liters: use actualLt if set, else vouchers minus deduction
   function effectiveLt(e){
-    if(e.actualLt) return e.actualLt;
+    if(e.actualLt!=null) return e.actualLt;
     const nom=toLt(e.v10,e.v20,e.v30);
-    return nom - (deductPer20/20)*nom;
+    return nom-(deductPer20/20)*nom;
   }
 
+  // ── Brim-to-brim efficiency calculation ──
+  // Only calc km/base between consecutive FULL fills that have odometer
   const fillsWithOdo=fills.filter(e=>e.odometer);
-  const distances=[];
-  for(let i=1;i<fillsWithOdo.length;i++) distances.push(fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer);
+  const effMap={};   // entry.id → km/base (only for full fills after another full fill)
+  const distMap={};  // entry.id → km distance since last fill (any)
+  const accumMap={}; // entry.id → accumulated liters since last full fill
 
+  // Simple distance map (any fill to next fill)
+  for(let i=1;i<fillsWithOdo.length;i++){
+    distMap[fillsWithOdo[i].id]=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
+  }
+
+  // Brim-to-brim: track accumulated liters between full fills
+  let accumLt=0;
+  let lastFullOdo=null;
+  let lastFullIdx=-1;
+  for(let i=0;i<fillsWithOdo.length;i++){
+    const e=fillsWithOdo[i];
+    const lt=effectiveLt(e);
+    const isFull=e.fullFill!==false; // default true if not set
+
+    if(i===0){
+      // First fill — just set baseline if full
+      if(isFull){ lastFullOdo=e.odometer; lastFullIdx=i; accumLt=0; }
+      else { accumLt+=lt; }
+      accumMap[e.id]=null; // no efficiency for first fill
+      continue;
+    }
+
+    accumLt+=lt;
+
+    if(isFull && lastFullOdo!=null){
+      const dist=e.odometer-lastFullOdo;
+      const eff=(dist/accumLt*base).toFixed(1);
+      effMap[e.id]=eff;
+      accumMap[e.id]={dist,lt:accumLt.toFixed(1),eff};
+      // reset accumulator
+      lastFullOdo=e.odometer;
+      accumLt=0;
+    } else if(isFull){
+      // Full fill but no previous full fill with odo
+      lastFullOdo=e.odometer;
+      accumLt=0;
+      accumMap[e.id]=null;
+    } else {
+      accumMap[e.id]=null; // partial fill — no efficiency
+    }
+  }
+
+  // Overall stats (brim-to-brim only)
+  const effVals=Object.values(effMap).map(v=>parseFloat(v)).filter(v=>!isNaN(v));
+  const avgEff=effVals.length?(effVals.reduce((a,b)=>a+b,0)/effVals.length).toFixed(1):0;
   const totalNomLt=fills.reduce((s,e)=>s+toLt(e.v10,e.v20,e.v30),0);
   const totalActLt=fills.reduce((s,e)=>s+effectiveLt(e),0);
-  const avgDist=distances.length?Math.round(distances.reduce((a,b)=>a+b,0)/distances.length):0;
+  const fullFillsWithOdo=fillsWithOdo.filter(e=>e.fullFill!==false);
   const lastOdo=fillsWithOdo.length?fillsWithOdo[fillsWithOdo.length-1].odometer:0;
-  const totalDist=fillsWithOdo.length>1?fillsWithOdo[fillsWithOdo.length-1].odometer-fillsWithOdo[0].odometer:0;
-  const totalDistLt=fills.slice(1).reduce((s,e)=>s+effectiveLt(e),0);
-  const overallEff=totalDistLt>0?(totalDist/totalDistLt*base).toFixed(1):0;
+  const totalDist=fullFillsWithOdo.length>1?fullFillsWithOdo[fullFillsWithOdo.length-1].odometer-fullFillsWithOdo[0].odometer:0;
 
   document.getElementById('nissan-metrics').innerHTML=`
-    <div class="metric green"><div class="metric-label">Total fills</div><div class="metric-val">${fills.length}</div><div class="metric-sub">${totalNomLt}L nominal · ${totalActLt.toFixed(1)}L actual</div></div>
+    <div class="metric green"><div class="metric-label">Total fills</div><div class="metric-val">${fills.length}</div><div class="metric-sub">${fills.filter(e=>e.fullFill!==false).length} full · ${fills.filter(e=>e.fullFill===false).length} partial</div></div>
     <div class="metric"><div class="metric-label">Last odometer</div><div class="metric-val">${lastOdo?lastOdo.toLocaleString():'—'}</div><div class="metric-sub">km</div></div>
-    <div class="metric"><div class="metric-label">Avg distance/fill</div><div class="metric-val">${avgDist?avgDist.toLocaleString()+'km':'—'}</div><div class="metric-sub">between fill-ups</div></div>
-    <div class="metric accent"><div class="metric-label">km per ${base}L</div><div class="metric-val">${overallEff||'—'}</div><div class="metric-sub">overall efficiency</div></div>
-    <div class="metric"><div class="metric-label">Total tracked</div><div class="metric-val">${totalDist?totalDist.toLocaleString():'—'}</div><div class="metric-sub">km since first reading</div></div>`;
+    <div class="metric accent"><div class="metric-label">Avg km/${base}L</div><div class="metric-val">${avgEff||'—'}</div><div class="metric-sub">brim-to-brim · ${effVals.length} readings</div></div>
+    <div class="metric"><div class="metric-label">Total tracked</div><div class="metric-val">${totalDist?totalDist.toLocaleString():'—'}</div><div class="metric-sub">km · ${totalActLt.toFixed(1)}L actual</div></div>`;
 
   // Date range filter
-  const rangeHtml=`<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+  document.getElementById('nissan-range-wrap').innerHTML=`<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
     <div class="form-group"><label style="font-size:12px;color:var(--text2)">From</label><input type="date" id="nissan-from" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
     <div class="form-group"><label style="font-size:12px;color:var(--text2)">To</label><input type="date" id="nissan-to" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
     <button class="btn btn-sm" onclick="clearNissanFilter()">Clear</button>
-    <span id="nissan-range-avg" style="font-size:13px;color:var(--text2);margin-left:8px"></span>
+    <span id="nissan-range-avg" style="font-size:13px;color:var(--text2);margin-left:4px"></span>
   </div>`;
-  document.getElementById('nissan-range-wrap').innerHTML=rangeHtml;
 
-  // Build dist map
-  const distMap={}, effMap={};
-  for(let i=1;i<fillsWithOdo.length;i++){
-    const dist=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
-    distMap[fillsWithOdo[i].id]=dist;
-    const actLt=effectiveLt(fillsWithOdo[i]);
-    effMap[fillsWithOdo[i].id]=actLt>0?(dist/actLt*base).toFixed(1):'—';
-  }
-
-  renderNissanFiltered(fills,distMap,effMap,effectiveLt,base);
-
-  // Chart - km/base per fill
-  const chartFills=fillsWithOdo.filter(e=>effMap[e.id]&&effMap[e.id]!=='—');
+  // Chart — only full fill efficiency
+  const chartFills=fillsWithOdo.filter(e=>effMap[e.id]);
   const lbls=chartFills.map(e=>fmtDate(e.dateStr));
   const vals=chartFills.map(e=>parseFloat(effMap[e.id]));
   destroyChart('nissanChart');
   if(vals.length){
     charts['nissanChart']=new Chart(document.getElementById('nissanChart'),{
       type:'line',
-      data:{labels:lbls,datasets:[{data:vals,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',tension:.3,pointRadius:3,borderWidth:2,fill:true,label:`km/${base}L`}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{title:{display:true,text:`km per ${base}L`,font:{size:11}},ticks:{font:{size:11}}}}}
+      data:{labels:lbls,datasets:[{data:vals,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',tension:.3,pointRadius:4,borderWidth:2,fill:true,label:`km/${base}L`}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} km/${base}L`}}},scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{title:{display:true,text:`km per ${base}L`,font:{size:11}},ticks:{font:{size:11}}}}}
     });
   }
+
+  renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base);
 }
 
-function renderNissanFiltered(fills,distMap,effMap,effectiveLt,base){
+
+function renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base){
   const base2=base||getNissanBase();
   const deductPer20=getNissanDeduct();
   function effLt(e){if(e.actualLt)return e.actualLt;const nom=toLt(e.v10,e.v20,e.v30);return nom-(deductPer20/20)*nom;}
@@ -1329,11 +1367,11 @@ function renderNissanFiltered(fills,distMap,effMap,effectiveLt,base){
 
   // Range average km/base
   if((fromDate||toDate)&&document.getElementById('nissan-range-avg')){
-    const rangeFills=filtered.filter(e=>distMap[e.id]&&effMap[e.id]&&effMap[e.id]!=='—');
+    const rangeFills=filtered.filter(e=>accumMap&&accumMap[e.id]);
     if(rangeFills.length){
-      const avgEff=(rangeFills.reduce((s,e)=>s+parseFloat(effMap[e.id]),0)/rangeFills.length).toFixed(1);
-      const totalD=rangeFills.reduce((s,e)=>s+distMap[e.id],0);
-      document.getElementById('nissan-range-avg').innerHTML=`<strong>${rangeFills.length} fills</strong> · avg <strong>${avgEff} km/${base2}L</strong> · ${totalD.toLocaleString()} km total`;
+      const avgEff=(rangeFills.reduce((s,e)=>s+parseFloat(accumMap[e.id].eff),0)/rangeFills.length).toFixed(1);
+      const totalD=rangeFills.reduce((s,e)=>s+(accumMap[e.id].dist||0),0);
+      document.getElementById('nissan-range-avg').innerHTML=`<strong>${rangeFills.length} full fills</strong> · avg <strong>${avgEff} km/${base2}L</strong> · ${totalD.toLocaleString()} km total`;
     } else {
       document.getElementById('nissan-range-avg').textContent='No fills with odometer in range';
     }

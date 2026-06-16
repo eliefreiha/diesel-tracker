@@ -2,286 +2,197 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Diesel Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diesel Voucher Tracker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{
-  --bg:#f5f5f3;--surface:#ffffff;--surface2:#f0f0ee;--border:#e8e8e5;--border2:#d0d0cc;
-  --text:#1a1a18;--text2:#6b6b66;--text3:#9a9a94;
-  --navy:#1A2744;--gold:#F5C842;--green:#0F6E56;--red:#dc2626;
-  --r:10px;--rs:7px;--rxs:5px;
-  --shadow:0 1px 2px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.04);
-}
-@media(prefers-color-scheme:dark){:root{
-  --bg:#111113;--surface:#1c1c1e;--surface2:#28282a;--border:#333336;--border2:#444448;
-  --text:#f0f0ec;--text2:#9a9a94;--text3:#6a6a64;
-  --shadow:0 1px 3px rgba(0,0,0,.3);
-}}
-html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
-
-/* ── HEADER ── */
-.header{background:var(--navy);color:#fff;padding:13px 20px;display:flex;align-items:center;gap:12px}
-.header-icon{width:34px;height:34px;background:var(--gold);border-radius:8px;display:grid;place-items:center;font-size:16px;flex-shrink:0}
-.header h1{font-size:15px;font-weight:600;letter-spacing:-.2px}
-.header p{font-size:11px;color:rgba(255,255,255,.5);margin-top:1px}
-.header-right{margin-left:auto;display:flex;gap:6px;align-items:center}
-.h-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:5px 11px;border-radius:var(--rxs);font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
-.h-btn:hover{background:rgba(255,255,255,.18)}
-.conn-status{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.65);background:rgba(255,255,255,.08);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,255,255,.12)}
-.conn-dot{width:6px;height:6px;border-radius:50%;background:#6b7280;flex-shrink:0}
-.conn-dot.online{background:#34d399;animation:pulse 2s infinite}
-.conn-dot.loading{background:#fbbf24;animation:pulse .7s infinite}
-.conn-dot.offline{background:#f87171}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-
-/* ── NAV ── */
-.nav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
-.nav::-webkit-scrollbar{display:none}
-.nav-btn{flex:1;min-width:72px;padding:11px 6px 10px;font-size:12px;font-weight:500;color:var(--text2);border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:2px;white-space:nowrap;transition:color .15s}
-.nav-btn .nb-icon{font-size:16px;line-height:1}
+:root{--bg:#f8f8f6;--surface:#fff;--surface2:#f2f1ee;--border:rgba(0,0,0,.1);--border2:rgba(0,0,0,.2);--text:#1a1a18;--text2:#6b6b66;--text3:#9a9a94;--navy:#1A2744;--gold:#F5C842;--green:#0F6E56;--red:#dc2626;--r:10px;--rs:6px}
+@media(prefers-color-scheme:dark){:root{--bg:#18181a;--surface:#222224;--surface2:#2c2c2e;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);--text:#f0f0ec;--text2:#a0a09a;--text3:#6a6a64}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px}
+.header-icon{width:36px;height:36px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.header h1{font-size:16px;font-weight:600}.header p{font-size:11px;opacity:.6;margin-top:1px}
+.header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.conn-status{font-size:11px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,.15);display:flex;align-items:center;gap:5px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:#aaa}
+.conn-dot.online{background:#4ade80}.conn-dot.offline{background:#f87171}.conn-dot.loading{background:#fbbf24;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 22px;overflow-x:auto}
+.nav-btn{padding:12px 16px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--text2);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .nav-btn.active{color:var(--navy);border-bottom-color:var(--navy);font-weight:600}
-
-/* ── PAGES ── */
-.page{display:none;padding:16px;max-width:1060px;margin:0 auto}
-.page.active{display:block}
-
-/* ── CARDS ── */
-.card{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px}
-.card-body{padding:16px}
-.card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px}
-
-/* ── METRICS ── */
-.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
-.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow)}
+.page{display:none;padding:20px;max-width:1100px;margin:0 auto}.page.active{display:block}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px 15px}
 .metric.accent{border-left:3px solid var(--gold)}
-.metric.green-accent{border-left:3px solid var(--green)}
-.metric-label{font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-.metric-val{font-size:20px;font-weight:600;line-height:1.1}
-.metric-sub{font-size:10px;color:var(--text3);margin-top:2px}
-
-/* ── TABLE ── */
-.tbl-filters{display:flex;gap:8px;padding:12px;border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center}
-.tbl-wrap{overflow-x:auto}
+.metric.green{border-left:3px solid var(--green)}
+.metric-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.metric-val{font-size:22px;font-weight:600}.metric-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.section-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap}
+th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border)}
 td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:var(--surface2)}
-.tr{text-align:right}
-.empty-state{text-align:center;padding:32px;color:var(--text3);font-size:13px}
-
-/* ── BADGES ── */
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
+tr:last-child td{border-bottom:none}tr:hover td{background:var(--surface2)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
 .b-car{background:#dbeafe;color:#1e40af}.b-gift{background:#ede9fe;color:#5b21b6}
-.b-sale{background:#dcfce7;color:#166534}.b-recv{background:#d1fae5;color:#065f46}
-.b-buy{background:#fef9c3;color:#854d0e}.b-other{background:var(--surface2);color:var(--text2)}
+.b-sale{background:#dcfce7;color:#166534}.b-recv{background:#ccfbf1;color:#0f5132}
+.b-buy{background:#fef9c3;color:#854d0e}.b-other{background:#f3f4f6;color:#374151}
 @media(prefers-color-scheme:dark){
-  .b-car{background:#1e3a5f;color:#93c5fd}.b-gift{background:#2e1d5e;color:#c4b5fd}
-  .b-sale{background:#14532d;color:#86efac}.b-recv{background:#064e3b;color:#6ee7b7}
-  .b-buy{background:#451a03;color:#fcd34d}.b-other{background:var(--surface2);color:var(--text2)}
-}
-
-/* ── BUTTONS ── */
-.btn{padding:8px 16px;border-radius:var(--rs);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text);transition:all .15s;display:inline-flex;align-items:center;gap:5px}
-.btn:hover{background:var(--surface2)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
-.btn-primary:hover:not(:disabled){background:#243562}
-.btn-sm{padding:5px 10px;font-size:12px}
-.btn-edit{color:var(--navy);border:none;background:transparent;padding:4px 6px;cursor:pointer;border-radius:var(--rxs);font-size:14px}
-.btn-edit:hover{background:var(--surface2)}
-.btn-del{color:var(--red);border:none;background:transparent;padding:4px 6px;cursor:pointer;border-radius:var(--rxs);font-size:14px}
-.btn-del:hover{background:#fee2e2}
-
-/* ── FORMS ── */
+.b-car{background:#1e3a5f;color:#93c5fd}.b-gift{background:#2e1d5e;color:#c4b5fd}
+.b-sale{background:#14532d;color:#86efac}.b-recv{background:#064e3b;color:#6ee7b7}
+.b-buy{background:#451a03;color:#fcd34d}.b-other{background:#374151;color:#d1d5db}}
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px}
 .form-group{display:flex;flex-direction:column;gap:4px}
-.form-group label{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px}
-input,select{font-size:13px;padding:8px 11px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface);color:var(--text);width:100%;outline:none;transition:border-color .15s}
-input:focus,select:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(26,39,68,.08)}
-input:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed}
-.hint{font-size:11px;color:var(--text3);margin-top:2px}
-.hint.green{color:var(--green)}
-
-/* ── VOUCHER INPUTS ── */
-.v-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.form-group label{font-size:12px;font-weight:500;color:var(--text2)}
+input,select{font-size:14px;padding:8px 11px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);width:100%;outline:none}
+input:focus,select:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,39,68,.12)}
+input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
+.v-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
 .v-wrap{display:flex;flex-direction:column;gap:4px}
-.v-lbl{font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;display:inline-block;width:fit-content}
-.t10{background:#fef9c3;color:#854d0e}.t20{background:#dbeafe;color:#1e40af}.t30{background:#d1fae5;color:#065f46}
-@media(prefers-color-scheme:dark){
-  .t10{background:#451a03;color:#fcd34d}.t20{background:#1e3a5f;color:#93c5fd}.t30{background:#064e3b;color:#6ee7b7}
-}
-.v-total-bar{background:var(--surface2);border-radius:var(--rs);padding:9px 12px;display:flex;gap:12px;align-items:center;margin-bottom:12px;font-size:13px;flex-wrap:wrap}
-.vtb-lbl{font-size:11px;color:var(--text2)}
-.vtb-val{font-weight:600}
-
-/* ── WARN ── */
-.warn-box{background:#fef2f2;border:1px solid #fecaca;border-radius:var(--rs);padding:9px 12px;font-size:12px;color:#991b1b;margin-bottom:10px;display:none}
-.warn-box.show{display:block}
-@media(prefers-color-scheme:dark){.warn-box{background:#450a0a;border-color:#7f1d1d;color:#fca5a5}}
-
-/* ── ODO SECTION ── */
-.odo-section{background:var(--surface2);border-radius:var(--rs);padding:13px;margin-bottom:12px;display:none}
-.odo-section.visible{display:block}
-.odo-title{font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:5px}
-.odo-last{font-size:11px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);line-height:1.6}
-.quick-settings-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
-.qs-lbl{font-size:11px;color:var(--text3);flex-shrink:0}
-.qs-input{font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:var(--rxs);background:var(--surface);color:var(--text);outline:none}
-.qs-input:focus{border-color:var(--navy)}
-
-/* ── FORM CARD ── */
-.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
-
-/* ── STOCK CARDS ── */
-.stock-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
-.stock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)}
-.stock-type{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;display:inline-block;margin-bottom:8px}
-.stock-count{font-size:32px;font-weight:700;line-height:1}
-.stock-sub{font-size:11px;color:var(--text2);margin-top:3px}
-.ttank{background:#ede9fe;color:#5b21b6}
-@media(prefers-color-scheme:dark){.ttank{background:#2e1d5e;color:#c4b5fd}}
-
-/* ── CHARTS ── */
-.chart-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.v-lbl{font-size:12px;font-weight:600;padding:3px 8px;border-radius:5px;display:inline-flex;align-items:center;justify-content:space-between}
+.v-stock{font-size:11px;font-weight:400;opacity:.75}
+.v-warn{border:1.5px solid #f87171!important}
+.btn{padding:8px 18px;border-radius:var(--rs);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text);transition:all .15s}
+.btn:hover{background:var(--surface2)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}.btn-primary:hover{opacity:.88}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:4px}
+.btn-edit{color:#185FA5;border-color:transparent;background:transparent}.btn-edit:hover{background:#dbeafe}
+.btn-del{color:#dc2626;border-color:transparent;background:transparent}.btn-del:hover{background:#fee2e2}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filter-bar input,.filter-bar select{max-width:160px;font-size:13px;padding:7px 10px}
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:22px}
+.stock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.stock-type{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:10px}
+.stock-count{font-size:34px;font-weight:700;line-height:1}.stock-sub{font-size:12px;color:var(--text2);margin-top:3px}
+.t10{background:#fef9c3;color:#854d0e}.t20{background:#dbeafe;color:#1e40af}.t30{background:#ccfbf1;color:#0f5132}.ttank{background:#ede9fe;color:#5b21b6}
+@media(prefers-color-scheme:dark){.t10{background:#451a03;color:#fcd34d}.t20{background:#1e3a5f;color:#93c5fd}.t30{background:#064e3b;color:#6ee7b7}.ttank{background:#2e1d5e;color:#c4b5fd}}
+.chart-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px}
 .chart-title{font-size:13px;font-weight:600;margin-bottom:12px}
 .chart-wrap{position:relative;width:100%}
-.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;font-size:11px;color:var(--text2)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;font-size:12px;color:var(--text2)}
 .legend span{display:flex;align-items:center;gap:4px}
-.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
-
-/* ── PROGRESS BARS ── */
-.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
-.prog-name{width:110px;font-size:12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.prog-bar-wrap{flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
-.prog-fill{height:100%;border-radius:3px;background:#6366f1}
-.prog-val{width:60px;font-size:11px;color:var(--text2);text-align:right}
-
-/* ── SETTINGS TOGGLES ── */
-.section-title{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-.toggle-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
-.toggle-row:last-child{border-bottom:none}
-.toggle-name{font-size:13px;font-weight:500;flex:1}
-.toggle-meta{font-size:11px;color:var(--text3)}
-.toggle-switch{position:relative;width:36px;height:20px;flex-shrink:0;cursor:pointer}
-.toggle-switch input{opacity:0;width:0;height:0;position:absolute}
-.toggle-track{position:absolute;inset:0;background:var(--border2);border-radius:10px;transition:.2s}
-.toggle-thumb{position:absolute;width:16px;height:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-.toggle-switch input:checked~.toggle-track{background:var(--green)}
-.toggle-switch input:checked~.toggle-thumb{left:18px}
-
-/* ── MODALS ── */
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:16px}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.prog-name{width:110px;font-size:13px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-bar-wrap{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;border-radius:4px;background:#534AB7}
+.prog-val{width:60px;font-size:12px;color:var(--text2);text-align:right}
+#toast{position:fixed;bottom:22px;right:22px;background:var(--navy);color:#fff;padding:11px 17px;border-radius:var(--r);font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
+#toast.show{opacity:1}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
 .modal-bg.open{display:flex}
-.modal{background:var(--surface);border-radius:var(--r);padding:20px;width:min(560px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal{background:var(--surface);border-radius:var(--r);padding:22px;width:min(580px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
 .modal-title{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
-.modal-close{background:var(--surface2);border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--text);display:grid;place-items:center}
-.modal-close:hover{background:var(--border)}
-.setup-note{background:var(--surface2);border-radius:var(--rs);padding:12px;font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.7}
-.setup-note code{background:var(--surface);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:11px}
-
-/* ── TOAST ── */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--navy);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;font-weight:500;pointer-events:none;transition:transform .25s;z-index:999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.2)}
-#toast.show{transform:translateX(-50%) translateY(0)}
-
-/* ── FILTER BAR ── */
-.filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.filter-bar input,.filter-bar select{font-size:12px;padding:6px 10px;max-width:160px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none}
-.filter-bar input:focus,.filter-bar select:focus{border-color:var(--navy)}
-
-/* ── RESPONSIVE ── */
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);line-height:1}
+/* Setup modal */
+.setup-box{background:var(--surface2);border-radius:var(--r);padding:16px;margin-bottom:12px;font-size:13px;color:var(--text2);line-height:1.7}
+.setup-box code{background:var(--surface);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;color:var(--text)}
+/* Odometer section */
+.odo-section{background:linear-gradient(135deg,rgba(26,39,68,.06),rgba(15,110,86,.06));border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.odo-section.hidden{display:none}
+.odo-title{font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.odo-last{font-size:12px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.warn-box{background:#fef2f2;border:1px solid #fecaca;border-radius:var(--rs);padding:10px 13px;font-size:13px;color:#991b1b;margin-bottom:10px;display:none}
+@media(prefers-color-scheme:dark){.warn-box{background:#450a0a;border-color:#7f1d1d;color:#fca5a5}}
+.warn-box.show{display:block}
+.empty-state{text-align:center;padding:36px;color:var(--text3);font-size:14px}
+.nissan-badge{display:inline-flex;align-items:center;gap:4px;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
 @media(max-width:768px){
   .page{padding:12px}
-  .metrics{grid-template-columns:1fr 1fr 1fr}
-  .form-grid{grid-template-columns:1fr}
-  .v-grid{grid-template-columns:1fr 1fr 1fr}
-  .col-hide-mobile{display:none}
-  div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
-}
-@media(max-width:480px){
   .metrics{grid-template-columns:1fr 1fr}
   .stock-grid{grid-template-columns:1fr 1fr}
-  .col-hide-tablet{display:none}
-  .nav-btn{font-size:10px;min-width:56px}
-  .header h1{font-size:13px}
-  .h-btn span{display:none}
+  .v-grid{grid-template-columns:1fr}
+  .filter-bar{gap:6px}
+  .filter-bar input,.filter-bar select{max-width:100%!important;font-size:13px}
+  .form-grid{grid-template-columns:1fr}
+  .modes-row{grid-template-columns:1fr}
+  /* Hide less important log columns on mobile */
+  .col-hide-mobile{display:none}
+  /* Nav scrollable */
+  .nav{padding:0 12px}
+  .nav-btn{padding:10px 12px;font-size:12px}
+  /* Header compact */
+  .header{padding:10px 14px;gap:8px}
+  .header h1{font-size:14px}
+  .header-right{gap:6px}
+  .hbtn,.btn[style*="color:#fff"]{font-size:11px;padding:5px 8px}
+  /* Metric cards */
+  .metric-val{font-size:18px}
+  /* Stock grid */
+  .stock-grid{grid-template-columns:1fr 1fr}
+  /* Charts */
+  .chart-wrap canvas{max-height:200px}
+  /* Stats 2-col → 1-col */
+  div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  /* Modal full width */
+  .modal{width:95vw;padding:16px}
+  /* Nissan quick settings wrap */
+  .odo-section div[style*="display:flex;gap:14px"]{flex-direction:column;gap:8px}
+}
+@media(max-width:480px){
+  .metrics{grid-template-columns:1fr}
+  .stock-grid{grid-template-columns:1fr}
+  .header-right .hbtn:not(:last-child){display:none}
+  .nav-btn{padding:10px 8px;font-size:11px}
 }
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
 <div class="header">
   <div class="header-icon">⛽</div>
-  <div><h1>Diesel Voucher Tracker</h1><p>Track 10L · 20L · 30L vouchers</p></div>
+  <div><h1>Diesel Voucher Tracker</h1><p>Track 10L · 20L · 30L vouchers · <span style="color:var(--gold)">v10</span></p></div>
   <div class="header-right">
-    <div class="conn-status" id="conn-status">
-      <span class="conn-dot" id="conn-dot"></span>
-      <span id="conn-text">Connecting...</span>
-    </div>
-    <button class="h-btn" onclick="openSetup()">⚙ <span>Supabase</span></button>
-    <button class="h-btn" onclick="exportCSV()">⬇ <span>CSV</span></button>
-    <a href="fuel-calculator.html" class="h-btn">💰 <span>Fuel Calc</span></a>
+    <div class="conn-status" id="conn-status"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting...</span></div>
+    <button class="btn" style="color:#fff;border-color:rgba(255,255,255,.3);font-size:12px" onclick="openSetup()">⚙ Supabase</button>
+    <a href="fuel-calculator.html" style="color:#fff;border-color:rgba(255,255,255,.3);font-size:12px;padding:8px 14px;border-radius:6px;border:1px solid rgba(255,255,255,.3);text-decoration:none">⛽ Fuel Calc</a> <button class="btn" style="color:#fff;border-color:rgba(255,255,255,.3);font-size:12px" onclick="exportCSV()">⬇ CSV</button>
   </div>
 </div>
 
-<!-- NAV -->
 <nav class="nav">
-  <button class="nav-btn active" onclick="showPage('log',this)"><span class="nb-icon">📋</span>Log</button>
-  <button class="nav-btn" onclick="showPage('add',this)"><span class="nb-icon">➕</span>Add</button>
-  <button class="nav-btn" onclick="showPage('stock',this)"><span class="nb-icon">🛡</span>Stock</button>
-  <button class="nav-btn" onclick="showPage('nissan',this)"><span class="nb-icon">🚗</span>Nissan</button>
-  <button class="nav-btn" onclick="showPage('stats',this)"><span class="nb-icon">📊</span>Stats</button>
-  <button class="nav-btn" onclick="showPage('settings',this)"><span class="nb-icon">⚙️</span>Settings</button>
+  <button class="nav-btn active" onclick="showPage('log',this)">📋 Log</button>
+  <button class="nav-btn" onclick="showPage('add',this)">➕ Add Entry</button>
+  <button class="nav-btn" onclick="showPage('stock',this)">🛡 Stock</button>
+  <button class="nav-btn" onclick="showPage('nissan',this)">🚗 Nissan</button>
+  <button class="nav-btn" onclick="showPage('stats',this)">📊 Stats</button>
+  <button class="nav-btn" onclick="showPage('settings',this)">⚙️ Settings</button>
 </nav>
 
-<!-- LOG PAGE -->
+<!-- LOG -->
 <div id="page-log" class="page active">
   <div class="metrics" id="top-metrics"></div>
-  <div class="card">
-    <div class="tbl-filters">
-      <div class="filter-bar">
-        <select id="filter-type" onchange="renderLog()">
-          <option value="">All types</option>
-          <option value="تعبئة">Car fill</option>
-          <option value="استلام">Received</option>
-          <option value="هدية">Gift</option>
-          <option value="بيع">Sale</option>
-          <option value="بيع مني">Sale (personal)</option>
-          <option value="شراء">Purchase</option>
-          <option value="تعبئة من السيارة">From car</option>
-        </select>
-        <input type="text" id="filter-person" placeholder="Person / vehicle..." oninput="renderLog()">
-        <select id="filter-year" onchange="renderLog()"></select>
-        <button class="btn btn-sm" onclick="clearFilters()">Clear</button>
-      </div>
-    </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          <th>Date</th><th>Type</th><th>Person</th>
-          <th class="tr col-hide-mobile">10L</th>
-          <th class="tr col-hide-mobile">20L</th>
-          <th class="tr col-hide-mobile">30L</th>
-          <th class="tr">Liters</th>
-          <th class="tr">Actual L</th>
-          <th class="tr">Tanks</th>
-          <th class="tr col-hide-mobile">Balance</th>
-          <th class="tr col-hide-mobile">Odometer</th>
-          <th class="tr col-hide-mobile">Distance</th>
-          <th class="col-hide-mobile">Notes</th>
-          <th></th>
-        </tr></thead>
-        <tbody id="log-body"></tbody>
-      </table>
-    </div>
-    <p style="font-size:11px;color:var(--text3);padding:8px 12px;border-top:1px solid var(--border)" id="log-count"></p>
+  <div class="filter-bar">
+    <select id="filter-type" onchange="renderLog()">
+      <option value="">All types</option>
+      <option value="تعبئة">Car fill</option>
+      <option value="هدية">Gift</option>
+      <option value="بيع">Sale</option>
+      <option value="بيع مني">Sale (personal)</option>
+      <option value="استلام">Received</option>
+      <option value="شراء">Purchase</option>
+      <option value="تعبئة من السيارة">From car</option>
+    </select>
+    <input type="text" id="filter-person" placeholder="Person / vehicle..." oninput="renderLog()" style="max-width:155px;font-size:13px">
+    <select id="filter-year" onchange="renderLog()"></select>
+    <button class="btn btn-sm" onclick="clearFilters()">Clear</button>
   </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Type</th><th>Person / Vehicle</th>
+        <th style="text-align:right" class="col-hide-mobile">10L</th><th style="text-align:right" class="col-hide-mobile">20L</th><th style="text-align:right" class="col-hide-mobile">30L</th>
+        <th style="text-align:right">Liters</th><th style="text-align:right">Actual (L)</th><th style="text-align:right">Tanks</th>
+        <th class="col-hide-mobile">Odometer</th><th class="col-hide-mobile">Distance</th><th style="text-align:right">Balance</th><th>Notes</th><th></th>
+      </tr></thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+  <p style="font-size:12px;color:var(--text3);margin-top:7px" id="log-count"></p>
 </div>
 
-<!-- ADD PAGE -->
+<!-- ADD -->
 <div id="page-add" class="page">
   <div class="warn-box" id="stock-warn"></div>
   <div class="form-card">
@@ -294,9 +205,9 @@ input:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed}
           <option value="استلام">Received (استلام)</option>
           <option value="هدية">Gift (هدية)</option>
           <option value="بيع">Sale (بيع)</option>
-          <option value="بيع مني">Sale personal</option>
+          <option value="بيع مني">Sale personal (بيع مني)</option>
           <option value="شراء">Purchase (شراء)</option>
-          <option value="تعبئة من السيارة">From car</option>
+          <option value="تعبئة من السيارة">From car (تعبئة من السيارة)</option>
         </select>
       </div>
       <div class="form-group">
@@ -307,38 +218,37 @@ input:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed}
       <div class="form-group"><label>Notes</label><input type="text" id="inp-notes" placeholder="Optional"></div>
     </div>
 
-    <!-- Nissan odometer section -->
-    <div class="odo-section" id="odo-section">
+    <!-- Odometer (Nissan only) -->
+    <div class="odo-section hidden" id="odo-section">
       <div class="odo-title">🚗 Nissan — fill details</div>
       <div class="form-grid" style="margin-bottom:8px">
-        <div class="form-group"><label>Current odometer (km)</label>
-          <input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()">
-        </div>
+        <div class="form-group"><label>Current odometer (km)</label><input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()"></div>
         <div class="form-group">
           <label>Actual liters received</label>
-          <div style="display:flex;gap:6px">
-            <input type="number" id="inp-actual-lt" placeholder="0" min="0" step="0.5" style="flex:1" oninput="onActualLtManual()">
-            <button type="button" class="btn btn-sm" onclick="resetActualLt()" style="flex-shrink:0">↺</button>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="inp-actual-lt" placeholder="0" min="0" step="0.5" oninput="onActualLtManual()" style="flex:1">
+            <button type="button" class="btn btn-sm" onclick="resetActualLt()" title="Recalculate from vouchers" style="white-space:nowrap;padding:6px 10px">↺</button>
           </div>
-          <span class="hint green" id="actual-lt-hint"></span>
+          <span style="font-size:11px;margin-top:2px" id="actual-lt-hint"></span>
         </div>
       </div>
       <div class="odo-last" id="odo-preview"></div>
-      <div class="quick-settings-row">
-        <span class="qs-lbl">Quick settings:</span>
-        <select id="quick-nissan-mode" class="qs-input" onchange="onQuickNissanChange()">
-          <option value="1">Mode 1 — Liter</option>
-          <option value="2">Mode 2 — Cash (LBP)</option>
-        </select>
-        <div id="quick-deduct-wrap" style="display:flex;align-items:center;gap:4px">
-          <span class="qs-lbl">Deduct</span>
-          <input type="number" id="quick-deduct-lt" value="1" step="0.5" min="0" max="5" class="qs-input" style="width:55px" onchange="onQuickNissanChange()">
-          <span class="qs-lbl">L/20L</span>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--text2);font-weight:600">Quick settings:</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:11px;color:var(--text2)">Mode</label>
+          <select id="quick-nissan-mode" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)" onchange="onQuickNissanChange()">
+            <option value="1">Mode 1 — Liter deduction</option>
+            <option value="2">Mode 2 — Cash fee (LBP)</option>
+          </select>
         </div>
-        <div id="quick-fee-wrap" style="display:flex;align-items:center;gap:4px">
-          <span class="qs-lbl">Fee</span>
-          <input type="number" id="quick-fee-lbp" value="115000" step="1000" min="0" class="qs-input" style="width:90px" onchange="onQuickNissanChange()">
-          <span class="qs-lbl">LBP/20L</span>
+        <div style="display:flex;align-items:center;gap:6px" id="quick-deduct-wrap">
+          <label style="font-size:11px;color:var(--text2)">Deduct (L per 20L)</label>
+          <input type="number" id="quick-deduct-lt" value="1" step="0.5" min="0" max="5" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);width:65px" onchange="onQuickNissanChange()">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px" id="quick-fee-wrap">
+          <label style="font-size:11px;color:var(--text2)">Fee per 20L (LBP)</label>
+          <input type="number" id="quick-fee-lbp" value="115000" step="1000" min="0" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);width:100px" onchange="onQuickNissanChange()">
         </div>
       </div>
     </div>
@@ -346,57 +256,54 @@ input:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed}
     <div class="section-title" style="margin-bottom:8px">Vouchers</div>
     <div class="v-grid">
       <div class="v-wrap">
-        <span class="v-lbl t10">10L vouchers</span>
+        <span class="v-lbl t10">10L vouchers <span class="v-stock" id="stock-show-10"></span></span>
         <input type="number" id="inp-v10" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
-        <span class="hint" id="stock-show-10"></span>
       </div>
       <div class="v-wrap">
-        <span class="v-lbl t20">20L vouchers</span>
+        <span class="v-lbl t20">20L vouchers <span class="v-stock" id="stock-show-20"></span></span>
         <input type="number" id="inp-v20" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
-        <span class="hint" id="stock-show-20"></span>
       </div>
       <div class="v-wrap">
-        <span class="v-lbl t30">30L vouchers</span>
+        <span class="v-lbl t30">30L vouchers <span class="v-stock" id="stock-show-30"></span></span>
         <input type="number" id="inp-v30" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
-        <span class="hint" id="stock-show-30"></span>
       </div>
     </div>
-    <div class="v-total-bar">
-      <span class="vtb-lbl">Total:</span>
-      <span class="vtb-val" id="voucher-total-lt">0 L</span>
-      <span style="color:var(--border2)">·</span>
-      <span class="vtb-val" id="voucher-total-tanks">0.0 tanks</span>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--rs)">
+      <span style="font-size:12px;color:var(--text2)">Total:</span>
+      <span id="voucher-total-lt" style="font-size:14px;font-weight:600;color:var(--text)">0 L</span>
+      <span style="font-size:12px;color:var(--text3)">·</span>
+      <span id="voucher-total-tanks" style="font-size:14px;font-weight:600;color:var(--green)">0.0 tanks</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <button class="btn btn-primary" id="add-btn" onclick="addEntry()">Add entry</button>
-      <span id="add-preview" style="font-size:12px;color:var(--text2)"></span>
+      <span id="add-preview" style="font-size:13px;color:var(--text2)"></span>
     </div>
   </div>
-  <div class="form-card" style="background:var(--surface2)">
+  <div class="form-card" style="background:var(--surface2);border-style:dashed">
     <div class="section-title" style="margin-bottom:6px">Voucher values · 1 tank = 20L</div>
-    <p style="font-size:12px;color:var(--text2);line-height:1.7">
+    <p style="font-size:13px;color:var(--text2);line-height:1.7">
       <strong>10L = 10 liters</strong> · <strong>20L = 20 liters</strong> · <strong>30L = 30 liters</strong><br>
-      Received / Purchase adds to stock. All other types subtract. You cannot use more than you have.
+      Received / Purchase adds to stock. All other types subtract. You cannot use more vouchers than you have in stock.
     </p>
   </div>
 </div>
 
-<!-- STOCK PAGE -->
+<!-- STOCK -->
 <div id="page-stock" class="page">
-  <div class="section-title">Current stock</div>
+  <div class="section-title">Current voucher stock</div>
   <div class="stock-grid" id="stock-grid"></div>
   <div class="chart-box">
     <div class="chart-title">Stock history (voucher count)</div>
     <div class="legend">
-      <span><span class="leg-dot" style="background:#854d0e"></span>10L</span>
-      <span><span class="leg-dot" style="background:#1e40af"></span>20L</span>
-      <span><span class="leg-dot" style="background:#065f46"></span>30L</span>
+      <span><span class="leg-dot" style="background:#BA7517"></span>10L</span>
+      <span><span class="leg-dot" style="background:#185FA5"></span>20L</span>
+      <span><span class="leg-dot" style="background:#0F6E56"></span>30L</span>
     </div>
-    <div class="chart-wrap" style="height:240px"><canvas id="stockChart"></canvas></div>
+    <div class="chart-wrap" style="height:250px"><canvas id="stockChart"></canvas></div>
   </div>
 </div>
 
-<!-- NISSAN PAGE -->
+<!-- NISSAN -->
 <div id="page-nissan" class="page">
   <div class="metrics" id="nissan-metrics"></div>
   <div class="chart-box">
@@ -405,92 +312,99 @@ input:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed}
   </div>
   <div class="section-title" style="margin-top:4px">Fill-up history</div>
   <div id="nissan-range-wrap"></div>
-  <div class="card">
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          <th>Date</th>
-          <th class="tr col-hide-mobile">10L</th>
-          <th class="tr col-hide-mobile">20L</th>
-          <th class="tr col-hide-mobile">30L</th>
-          <th class="tr">Nominal L</th>
-          <th class="tr">Actual L</th>
-          <th class="tr col-hide-mobile">Odometer</th>
-          <th class="tr">Distance</th>
-          <th class="tr">km/20L</th>
-          <th class="col-hide-mobile">Notes</th>
-          <th></th>
-        </tr></thead>
-        <tbody id="nissan-body"></tbody>
-      </table>
-    </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Date</th>
+        <th style="text-align:right" class="col-hide-mobile">10L</th><th style="text-align:right" class="col-hide-mobile">20L</th><th style="text-align:right" class="col-hide-mobile">30L</th>
+        <th style="text-align:right">Nominal (L)</th>
+        <th style="text-align:right">Actual (L)</th>
+        <th style="text-align:right">Odometer</th>
+        <th style="text-align:right">Distance</th>
+        <th style="text-align:right">km/20L</th>
+        <th>Notes</th><th></th>
+      </tr></thead>
+      <tbody id="nissan-body"></tbody>
+    </table>
   </div>
 </div>
 
-<!-- STATS PAGE -->
+<!-- STATS -->
 <div id="page-stats" class="page">
   <div class="metrics" id="stats-metrics"></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <div class="chart-box">
-      <div class="chart-title">Usage by type (tanks)</div>
-      <div class="chart-wrap" style="height:210px"><canvas id="usageChart"></canvas></div>
+      <div class="chart-title">Usage by type (tanks of 20L)</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="usageChart"></canvas></div>
     </div>
     <div class="chart-box">
       <div class="chart-title">Monthly intake vs usage (tanks)</div>
       <div class="legend">
-        <span><span class="leg-dot" style="background:#065f46"></span>Intake</span>
-        <span><span class="leg-dot" style="background:#1e40af"></span>Usage</span>
+        <span><span class="leg-dot" style="background:#0F6E56"></span>Intake</span>
+        <span><span class="leg-dot" style="background:#185FA5"></span>Usage</span>
       </div>
-      <div class="chart-wrap" style="height:190px"><canvas id="monthlyChart"></canvas></div>
+      <div class="chart-wrap" style="height:200px"><canvas id="monthlyChart"></canvas></div>
     </div>
   </div>
   <div class="chart-box">
-    <div class="chart-title">Top recipients — gifts &amp; sales</div>
+    <div class="chart-title">Top recipients — gifts &amp; sales (tanks)</div>
     <div id="top-recipients"></div>
   </div>
 </div>
 
+
 <!-- SETTINGS PAGE -->
 <div id="page-settings" class="page">
   <div class="form-card">
-    <div class="section-title" style="margin-bottom:12px">Operation Types</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Toggle types on/off to show or hide them in the Add Entry form.</p>
-    <div id="default-op-toggles"></div>
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div class="section-title" style="margin-bottom:10px">Custom types</div>
-      <div id="op-types-list" style="margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div class="form-group" style="flex:1;min-width:130px"><label>Arabic name</label><input type="text" id="new-op-name" placeholder="e.g. تبرع"></div>
-        <div class="form-group" style="flex:1;min-width:110px"><label>Label (EN)</label><input type="text" id="new-op-label" placeholder="Donation"></div>
-        <div class="form-group"><label>Coefficient</label>
-          <select id="new-op-coeff"><option value="-1">-1 (use stock)</option><option value="1">+1 (add stock)</option></select>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="addOpType()">Add type</button>
+    <div class="section-title" style="margin-bottom:14px">Operation Types</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Add custom operation types with their coefficient (+1 adds to stock, -1 subtracts).</p>
+    <div id="op-types-list" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="form-group" style="min-width:160px"><label>Arabic name</label><input type="text" id="new-op-name" placeholder="e.g. تبرع"></div>
+      <div class="form-group"><label>Label (EN)</label><input type="text" id="new-op-label" placeholder="e.g. Donation"></div>
+      <div class="form-group"><label>Coefficient</label>
+        <select id="new-op-coeff" style="width:90px">
+          <option value="-1">-1 (use)</option>
+          <option value="1">+1 (add)</option>
+        </select>
       </div>
+      <button class="btn btn-primary" onclick="addOpType()">Add type</button>
     </div>
   </div>
   <div class="form-card">
-    <div class="section-title" style="margin-bottom:12px">🚗 Nissan Settings</div>
+    <div class="section-title" style="margin-bottom:12px">Default operation types — toggle active/inactive</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Inactive types are hidden from the Add Entry dropdown. They still appear in the log.</p>
+    <div id="default-op-toggles"></div>
+  </div>
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:14px">Nissan Settings</div>
     <div class="form-grid">
-      <div class="form-group"><label>Deduction mode</label>
+      <div class="form-group">
+        <label>Deduction mode</label>
         <select id="nissan-mode" onchange="saveNissanSettings()">
           <option value="1">Mode 1 — Liter deduction</option>
           <option value="2" selected>Mode 2 — Cash fee (LBP)</option>
         </select>
       </div>
-      <div class="form-group"><label>km efficiency base (L)</label>
-        <input type="number" id="nissan-base" value="20" step="1" min="1" oninput="saveNissanSettings()">
-      </div>
-      <div class="form-group"><label>Liters deducted per 20L (Mode 1)</label>
+      <div class="form-group">
+        <label>Liters deducted per 20L voucher (Mode 1)</label>
         <input type="number" id="nissan-deduct" value="1" step="0.5" min="0" max="5" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">e.g. 1 → 20L voucher fills 19L actual</span>
       </div>
-      <div class="form-group"><label>Cash fee per 20L voucher — LBP (Mode 2)</label>
-        <input type="number" id="nissan-fee-lbp" value="115000" step="1000" oninput="saveNissanSettings()">
+      <div class="form-group">
+        <label>Cash fee per 20L voucher in LBP (Mode 2)</label>
+        <input type="number" id="nissan-fee-lbp" value="115000" step="1000" min="0" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">Station takes this LBP and fills rest in fuel</span>
+      </div>
+      <div class="form-group">
+        <label>km/L base for efficiency (liters)</label>
+        <input type="number" id="nissan-base" value="20" step="1" min="1" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">Default 20 → shows km per 20L</span>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)">
-      <button class="btn btn-primary btn-sm" onclick="bulkUpdateActualLt()">🔄 Recalculate all actual liters</button>
-      <span id="bulk-update-msg" style="font-size:12px;color:var(--text2)"></span>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="bulkUpdateActualLt()">🔄 Recalculate actual liters for all Nissan fills</button>
+      <span id="bulk-update-msg" style="font-size:13px;color:var(--text2)"></span>
     </div>
   </div>
 </div>
@@ -507,28 +421,29 @@ input:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed}
           <option value="استلام">Received (استلام)</option>
           <option value="هدية">Gift (هدية)</option>
           <option value="بيع">Sale (بيع)</option>
-          <option value="بيع مني">Sale personal</option>
+          <option value="بيع مني">Sale personal (بيع مني)</option>
           <option value="شراء">Purchase (شراء)</option>
-          <option value="تعبئة من السيارة">From car</option>
+          <option value="تعبئة من السيارة">From car (تعبئة من السيارة)</option>
         </select>
       </div>
-      <div class="form-group"><label>Person / Vehicle</label>
+      <div class="form-group">
+        <label>Person / Vehicle</label>
         <input type="text" id="edit-person" list="persons-list" placeholder="Type or choose..." oninput="onEditPersonChange()">
       </div>
       <div class="form-group"><label>Notes</label><input type="text" id="edit-notes"></div>
     </div>
-    <div class="odo-section" id="edit-odo-section">
+    <div class="odo-section hidden" id="edit-odo-section">
       <div class="odo-title">🚗 Nissan — fill details</div>
       <div class="form-grid">
-        <div class="form-group"><label>Odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
-        <div class="form-group"><label>Actual liters received</label><input type="number" id="edit-actual-lt" placeholder="Auto" min="0" step="0.5"></div>
+        <div class="form-group"><label>Current odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
+        <div class="form-group"><label>Actual liters received</label><input type="number" id="edit-actual-lt" placeholder="e.g. 28.5" min="0" step="0.5"><span style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank to auto-calculate</span></div>
       </div>
     </div>
     <div class="section-title" style="margin-bottom:8px">Vouchers</div>
     <div class="v-grid">
-      <div class="v-wrap"><span class="v-lbl t10">10L</span><input type="number" id="edit-v10" value="0" min="0" step="1"></div>
-      <div class="v-wrap"><span class="v-lbl t20">20L</span><input type="number" id="edit-v20" value="0" min="0" step="1"></div>
-      <div class="v-wrap"><span class="v-lbl t30">30L</span><input type="number" id="edit-v30" value="0" min="0" step="1"></div>
+      <div class="v-wrap"><span class="v-lbl t10">10L vouchers</span><input type="number" id="edit-v10" value="0" min="0" step="1"></div>
+      <div class="v-wrap"><span class="v-lbl t20">20L vouchers</span><input type="number" id="edit-v20" value="0" min="0" step="1"></div>
+      <div class="v-wrap"><span class="v-lbl t30">30L vouchers</span><input type="number" id="edit-v30" value="0" min="0" step="1"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn-primary" onclick="saveEdit()">Save changes</button>
@@ -541,29 +456,38 @@ input:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed}
 <div class="modal-bg" id="setup-modal">
   <div class="modal">
     <div class="modal-title">⚙ Supabase Setup <button class="modal-close" onclick="closeModal('setup-modal')">✕</button></div>
-    <div class="setup-note">
-      <strong>Step 1</strong> — <a href="https://supabase.com" target="_blank" style="color:var(--navy)">supabase.com</a> → create project<br>
-      <strong>Step 2</strong> — SQL Editor:<br>
-      <code>create table diesel_entries (id bigint primary key generated always as identity, date_str text, type text, person text, v10 int default 0, v20 int default 0, v30 int default 0, odometer int, actual_lt numeric, notes text, created_at timestamptz default now());</code><br>
-      <code>create table app_settings (key text primary key, value jsonb);</code><br>
-      <strong>Step 3</strong> — Project Settings → API → paste below
+    <div class="setup-box">
+      <strong>Step 1</strong> — Go to <a href="https://supabase.com" target="_blank" style="color:var(--navy)">supabase.com</a>, create a free project.<br><br>
+      <strong>Step 2</strong> — In SQL Editor, run:<br>
+      <code style="display:block;margin:8px 0;padding:10px;white-space:pre;overflow-x:auto;font-size:11px">create table diesel_entries (
+  id bigint primary key generated always as identity,
+  date_str text not null,
+  type text not null,
+  person text,
+  v10 int default 0,
+  v20 int default 0,
+  v30 int default 0,
+  odometer int,
+  notes text,
+  created_at timestamptz default now()
+);</code>
+      <strong>Step 3</strong> — Go to <em>Project Settings → API</em> and paste below.
     </div>
-    <div class="form-group" style="margin-bottom:10px"><label>Project URL</label><input type="text" id="setup-url" placeholder="https://xxxx.supabase.co"></div>
+    <div class="form-group" style="margin-bottom:10px"><label>Project URL</label><input type="text" id="setup-url" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
     <div class="form-group" style="margin-bottom:14px"><label>Anon Public Key</label><input type="text" id="setup-key" placeholder="eyJ..."></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px">
       <button class="btn btn-primary" onclick="saveSetup()">Connect</button>
       <button class="btn" onclick="closeModal('setup-modal')">Cancel</button>
-      <button class="btn" style="color:var(--red)" onclick="clearSetup()">Disconnect</button>
-      <button class="btn btn-sm" style="margin-left:auto" onclick="clearCacheReload()">🔄 Clear cache</button>
+      <button class="btn" style="margin-left:auto;color:var(--red)" onclick="clearSetup()">Disconnect</button>
     </div>
-    <p id="setup-msg" style="margin-top:10px;font-size:12px;color:var(--text2)"></p>
+    <p id="setup-msg" style="margin-top:10px;font-size:13px;color:var(--text2)"></p>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"><div class="section-title" style="margin-bottom:8px">Troubleshooting</div><button class="btn" style="font-size:12px" onclick="clearCacheReload()">🔄 Clear local cache &amp; reload from Supabase</button><p style="font-size:11px;color:var(--text3);margin-top:6px">Use this if the app shows wrong data after connecting to Supabase.</p></div>
   </div>
 </div>
 
 <div id="toast"></div>
 
 <script>
-
 // ── Startup: always wipe stale local data ──
 (function(){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
@@ -1545,10 +1469,6 @@ if(sbUrl&&sbKey){
   setConnStatus('offline','Local only — click ⚙ Supabase to connect');
   renderAll();
 }
-
-
-// Fix: odo-section uses .visible class in new CSS
-// Override the classList calls to match new CSS (.visible instead of removing 'hidden')
 </script>
 </body>
 </html>

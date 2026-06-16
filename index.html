@@ -223,6 +223,7 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <div class="odo-title">🚗 Nissan — fill details</div>
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-group"><label>Current odometer (km)</label><input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()"></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px"><input type="checkbox" id="inp-full-fill" style="width:15px;height:15px;cursor:pointer" checked><span style="font-size:13px;font-weight:500">🔵 Full fill</span></label><span style="font-size:11px;color:var(--text3);margin-top:2px">Uncheck if partial</span></div>
         <div class="form-group">
           <label>Actual liters received</label>
           <div style="display:flex;gap:6px;align-items:center">
@@ -436,6 +437,7 @@ input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
       <div class="odo-title">🚗 Nissan — fill details</div>
       <div class="form-grid">
         <div class="form-group"><label>Current odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px"><input type="checkbox" id="edit-full-fill" style="width:15px;height:15px;cursor:pointer" checked><span style="font-size:13px;font-weight:500">🔵 Full fill</span></label></div>
         <div class="form-group"><label>Actual liters received</label><input type="number" id="edit-actual-lt" placeholder="e.g. 28.5" min="0" step="0.5"><span style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank to auto-calculate</span></div>
       </div>
     </div>

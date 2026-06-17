@@ -1018,7 +1018,7 @@ function prefillAddEntry(){
   updateStockLabels();
 
   // Show odometer section
-  document.getElementById('odo-section').classList.add('visible');document.getElementById('odo-section').classList.remove('hidden');
+  document.getElementById('odo-section').classList.add('visible');document.getElementById('odo-section').classList.remove('hidden');document.getElementById('odo-section').classList.add('visible');
 
   // Calculate suggested odometer
   const nissanFills=entries
@@ -1118,8 +1118,8 @@ function onPersonChange(){
     document.getElementById('inp-v10').value=0;
     document.getElementById('inp-v20').value=0;
     document.getElementById('inp-v30').value=0;
-    sec.classList.remove('hidden');syncQuickNissanSettings();updateOdoPreview();
-  }else{sec.classList.add('hidden');}
+    sec.classList.remove('hidden');sec.classList.add('visible');syncQuickNissanSettings();updateOdoPreview();
+  }else{sec.classList.add('hidden');sec.classList.remove('visible');}
   updateVoucherTotal();
 }
 function onTypeChange(){
@@ -1145,7 +1145,7 @@ function onTypeChange(){
   onPersonChange();
   updateStockLabels();
   checkStock();
-  if(t!=='تعبئة') document.getElementById('odo-section').classList.remove('visible');document.getElementById('odo-section').classList.add('hidden');
+  if(t!=='تعبئة') document.getElementById('odo-section').classList.remove('visible');document.getElementById('odo-section').classList.remove('hidden');document.getElementById('odo-section').classList.add('visible');
 }
 function syncQuickNissanSettings(){
   // Sync quick settings from the main settings
@@ -1351,7 +1351,7 @@ async function addEntry(){
   document.getElementById('inp-v10').value=0;document.getElementById('inp-v20').value=0;document.getElementById('inp-v30').value=0;
   document.getElementById('inp-notes').value='';document.getElementById('inp-person').value='';document.getElementById('inp-odo').value='';
   document.getElementById('inp-actual-lt').value='';
-  document.getElementById('odo-section').classList.remove('visible');document.getElementById('odo-section').classList.add('hidden');
+  document.getElementById('odo-section').classList.remove('visible');document.getElementById('odo-section').classList.remove('hidden');document.getElementById('odo-section').classList.add('visible');
   document.getElementById('stock-warn').classList.remove('show');
   const lt=toLt(v10,v20,v30);
   document.getElementById('add-preview').textContent=`✓ ${typeLabel(type)} — ${lt} L (${(lt/20).toFixed(2)} tanks)`;

@@ -2643,7 +2643,10 @@ async function openAddModal(){
 }
 
 function openAddPanel(){openAddModal();}
-function closeAddPanel(){closeModal('add-modal');}
+function closeAddPanel(){
+  const m=document.getElementById('add-modal');
+  if(m) m.classList.remove('open');
+}
 function closeAddPanel(){
   document.getElementById('add-overlay').style.display='none';
   document.getElementById('add-panel').classList.remove('open');

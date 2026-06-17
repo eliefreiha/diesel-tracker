@@ -242,7 +242,12 @@ function loadSaved() {
     const s = JSON.parse(localStorage.getItem(LS) || '{}');
     if (s.price20)   document.getElementById('price20').value    = s.price20;
     if (s.deductLt)  document.getElementById('deduct-lt').value  = s.deductLt;
-    if (s.deductLbp !== undefined) document.getElementById('deduct-lbp').value = s.deductLbp;
+    // Load fee from shared key (set by tracker Nissan settings) or from saved settings
+    const sharedFee = localStorage.getItem('diesel_fee_lbp_per20');
+    const sharedPrice = localStorage.getItem('diesel_fuel_price_20');
+    if (sharedFee) document.getElementById('deduct-lbp').value = sharedFee;
+    else if (s.deductLbp !== undefined) document.getElementById('deduct-lbp').value = s.deductLbp;
+    if (sharedPrice && !s.price20) document.getElementById('price20').value = sharedPrice;
     if (s.priceDate) lastPriceDate   = s.priceDate;
     if (s.priceSrc)  lastPriceSource = s.priceSrc;
     return s;

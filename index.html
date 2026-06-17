@@ -3510,7 +3510,14 @@ if(sbUrl&&sbKey){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
   setConnStatus('loading','Loading from Supabase...');
   renderAll();
-  loadFromSupabase().then(()=>{renderAll();loadSettingsFromSupabase().then(()=>prefillAddEntry());}).catch(e=>setConnStatus('offline','Failed: '+e.message));
+  loadFromSupabase().then(async ()=>{
+    renderAll();
+    await loadSettingsFromSupabase();
+    renderVehiclesList();
+    refreshVehicleDropdowns();
+    prefillAddEntry();
+    setTimeout(()=>renderReminders&&renderReminders(),500);
+  }).catch(e=>setConnStatus('offline','Failed: '+e.message));
 }else{
   entries=localLoad();
   nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;
@@ -3529,11 +3536,19 @@ const LS_SVC_TYPES2='diesel_svc_types_v2';
 function getVehicles(){try{const s=JSON.parse(localStorage.getItem(LS_VEHICLES)||'null');if(s)return s;}catch(e){}return[{id:'nissan',name:'Nissan',plate:'',year:'',type:'suv'}];}
 function saveVehicles(v){try{localStorage.setItem(LS_VEHICLES,JSON.stringify(v));}catch(e){}if(sbUrl&&sbKey)sbSetSetting('vehicles',v);}
 function addVehicle(){
-  const name=document.getElementById('new-veh-name').value.trim();
+  const nameEl=document.getElementById('new-veh-name');
+  const name=nameEl?nameEl.value.trim():'';
   if(!name){alert('Please enter a vehicle name');return;}
+  const plate=(document.getElementById('new-veh-plate')||{}).value||'';
+  const year=(document.getElementById('new-veh-year')||{}).value||'';
+  const type=(document.getElementById('new-veh-type')||{}).value||'car';
   const v=getVehicles();
-  v.push({id:'veh_'+Date.now(),name,plate:document.getElementById('new-veh-plate').value.trim(),year:document.getElementById('new-veh-year').value,type:document.getElementById('new-veh-type').value});
-  saveVehicles(v);document.getElementById('new-veh-name').value='';renderVehiclesList();refreshVehicleDropdowns();toast('Vehicle added ✓');
+  v.push({id:'veh_'+Date.now(),name,plate,year,type});
+  saveVehicles(v);
+  if(nameEl)nameEl.value='';
+  const pe=document.getElementById('new-veh-plate');if(pe)pe.value='';
+  const ye=document.getElementById('new-veh-year');if(ye)ye.value='';
+  renderVehiclesList();refreshVehicleDropdowns();toast('Vehicle added ✓');
 }
 function removeVehicle(id){if(!confirm('Remove?'))return;saveVehicles(getVehicles().filter(v=>v.id!==id));renderVehiclesList();refreshVehicleDropdowns();}
 function renderVehiclesList(){

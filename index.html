@@ -2016,17 +2016,16 @@ function showPage(name,btn){
   if(name==='settings'){renderVehiclesList&&renderVehiclesList();refreshVehicleDropdowns&&refreshVehicleDropdowns();renderOpTypes&&renderOpTypes();renderDefaultOpToggles&&renderDefaultOpToggles();}
   if(name==='nissan') renderNissan&&renderNissan();
   if(name==='fuel'){
-    // Load saved fee & price then render immediately
-    const fi=document.getElementById('fc-fee-lbp');
-    const pi=document.getElementById('fc-price20');
-    const fee=localStorage.getItem('diesel_fee_lbp_per20');
-    const price=localStorage.getItem('diesel_fuel_price_20');
-    if(fi&&fee) fi.value=fee;
-    else if(fi) fi.value=getNissanFeeLbp?getNissanFeeLbp():115000;
-    if(pi&&price) pi.value=price;
-    else if(pi&&!pi.value) pi.value=2350000;
-    fcRecalc&&fcRecalc();
-    fcInit&&fcInit();
+    setTimeout(()=>{
+      const fi=document.getElementById('fc-fee-lbp');
+      const pi=document.getElementById('fc-price20');
+      const fee=localStorage.getItem('diesel_fee_lbp_per20');
+      const price=localStorage.getItem('diesel_fuel_price_20');
+      if(fi){fi.value=fee||(typeof getNissanFeeLbp==='function'?getNissanFeeLbp():115000);}
+      if(pi){pi.value=price||2350000;}
+      if(typeof fcRecalc==='function') fcRecalc();
+      if(typeof fcInit==='function') fcInit();
+    },50);
   }
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
@@ -2601,6 +2600,17 @@ function fcOnManual(){
   fcRecalc();fcSave();
 }
 function fcRecalc(){
+  // Ensure inputs have values before recalc
+  const p20el=document.getElementById('fc-price20');
+  const feelel=document.getElementById('fc-fee-lbp');
+  if(p20el&&!p20el.value){
+    const saved=localStorage.getItem('diesel_fuel_price_20');
+    p20el.value=saved||2350000;
+  }
+  if(feelel&&!feelel.value){
+    const savedFee=localStorage.getItem('diesel_fee_lbp_per20');
+    feelel.value=savedFee||(typeof getNissanFeeLbp==='function'?getNissanFeeLbp():115000);
+  }
   const p=fcGetP(),plt=p/20;
   const hp20=document.getElementById('h-p20');if(hp20)hp20.textContent=fcFmt(p);
   const hplt=document.getElementById('h-plt');if(hplt)hplt.textContent=fcFmt(plt);

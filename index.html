@@ -2007,11 +2007,30 @@ async function addServiceType(){
   const types=getServiceTypes2();types.push(newType);cacheSvcTypes(types);
   n.value='';renderServiceTypesList();toast('Added ✓');
 }
+async function toggleSvcTypeActive(id){
+  const types=getServiceTypes2();
+  const t=types.find(x=>x.id===id);if(!t)return;
+  t.active=t.active===false?true:false;
+  cacheSvcTypes(types);
+  // Update in Supabase
+  if(sbUrl&&sbKey){
+    try{await sbFetch('service_types?id=eq.'+id,{method:'PATCH',body:JSON.stringify({active:t.active})});}
+    catch(e){console.warn('toggle active',e);}
+  }
+  renderServiceTypesList();
+  renderReminders&&renderReminders();
+  toast(t.active?'Service activated':'Service disabled');
+}
 async function removeServiceType(id){
-  if(!confirm('Remove?'))return;
-  if(sbUrl&&sbKey){try{await sbFetch('service_types?id=eq.'+id,{method:'DELETE'});}catch(e){console.warn('svc type delete',e);}}
+  if(!confirm('Remove this service type?'))return;
+  if(sbUrl&&sbKey){
+    try{await sbFetch('service_types?id=eq.'+id,{method:'DELETE'});}
+    catch(e){console.warn('svc type delete',e);}
+  }
   cacheSvcTypes(getServiceTypes2().filter(t=>t.id!==id));
-  renderServiceTypesList();toast('Removed');
+  renderServiceTypesList();
+  renderReminders&&renderReminders();
+  toast('Removed');
 }
 function updateSvcReminderVisibility(val){
   const km=document.getElementById('new-svc-km-wrap');const ti=document.getElementById('new-svc-time-wrap');
@@ -2060,7 +2079,7 @@ function renderReminders(){
   const fv=(document.getElementById('svc-vehicle-filter')||{}).value||'';
   const tbody=document.getElementById('reminders-body');if(!tbody)return;
   const rows=[];
-  vehicles.filter(v=>!fv||v.id===fv).forEach(veh=>{const odo=getCurrentOdo(veh.id);types.forEach(t=>{const last=getLastService(t.id,veh.id);const st=getStatus(t,last,odo);if(!st)return;rows.push({veh,t,last,st});});});
+  vehicles.filter(v=>!fv||v.id===fv).forEach(veh=>{const odo=getCurrentOdo(veh.id);types.filter(t=>t.active!==false).forEach(t=>{const last=getLastService(t.id,veh.id);const st=getStatus(t,last,odo);if(!st)return;rows.push({veh,t,last,st});});});
   rows.sort((a,b)=>({overdue:0,soon:1,never:2,ok:3}[a.st.code]||3)-({overdue:0,soon:1,never:2,ok:3}[b.st.code]||3));
   if(!rows.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state">No reminders. Add service types with intervals in Service Types tab.</div></td></tr>';return;}
   tbody.innerHTML=rows.map(function(x){const veh=x.veh,t=x.t,last=x.last,st=x.st;
@@ -2087,11 +2106,19 @@ function renderMaintenanceLog(){
 function renderServiceTypesList(){
   const types=getServiceTypes2();const el=document.getElementById('service-types-list');if(!el)return;
   updateSvcReminderVisibility((document.getElementById('new-svc-reminder-type')||{}).value||'none');
-  el.innerHTML=types.length?types.map(function(t){
+  if(!types.length){el.innerHTML='<p style="font-size:13px;color:var(--text3);margin-bottom:10px">No types yet.</p>';return;}
+  el.innerHTML=types.map(function(t){
     const r=t.reminder;let txt='No reminder';
     if(r&&r.type!=='none'){const p=[];if(r.km&&(r.type==='km'||r.type==='both'))p.push('every '+r.km.toLocaleString()+' km');if(r.timeVal&&(r.type==='time'||r.type==='both'))p.push('every '+r.timeVal+' '+r.timeUnit);txt=p.join(' + ');}
-    return'<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:500;flex:1">'+t.name+'</span><span style="font-size:11px;color:var(--text3)">'+txt+'</span><button class="btn-icon del" onclick="removeServiceType('+JSON.stringify(t.id)+')">&#10005;</button></div>';
-  }).join(''):'<p style="font-size:13px;color:var(--text3);margin-bottom:10px">No types yet.</p>';
+    const active=t.active!==false;
+    const safeId=t.id.replace(/'/g,'');
+    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);opacity:'+(active?'1':'0.5')+'">'+
+      '<span style="font-size:13px;font-weight:500;flex:1;'+(active?'':'text-decoration:line-through;color:var(--text3)')+'">'+t.name+'</span>'+
+      '<span style="font-size:11px;color:var(--text3)">'+txt+'</span>'+
+      '<button class="btn btn-sm" style="font-size:11px;padding:3px 8px;'+(active?'':'background:var(--surface2)')+'" data-id="'+safeId+'" onclick="toggleSvcTypeActive(this.dataset.id)">'+(active?'Active':'Inactive')+'</button>'+
+      '<button class="btn-icon del" data-id="'+safeId+'" onclick="removeServiceType(this.dataset.id)">&#10005;</button>'+
+    '</div>';
+  }).join('');
 }
 let _mEditId=null;
 function openMaintenancePanel(preSvcId,preVehicleId){

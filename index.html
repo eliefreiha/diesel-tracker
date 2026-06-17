@@ -2370,16 +2370,19 @@ async function seedDefaultSvcTypes(){
   if(!sbUrl||!sbKey)return;
   console.log('Seeding default service types for new user...');
   try{
-    for(const t of DEFAULT_SVC_TYPES2){
-      const uid=currentUser&&(currentUser.id||currentUser.sub);
-      const row={id:t.id+'_'+Date.now(),name:t.name,reminder:t.reminder,active:true};
+    const uid=currentUser&&(currentUser.id||currentUser.sub);
+    const ts=Date.now();
+    const rows=DEFAULT_SVC_TYPES2.map((t,i)=>{
+      const row={id:t.id+'_'+ts+'_'+i,name:t.name,reminder:t.reminder,active:true};
       if(uid) row.user_id=uid;
-      await sbFetch('service_types',{
-        method:'POST',
-        headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},
-        body:JSON.stringify(row)
-      });
-    }
+      return row;
+    });
+    // Insert all at once
+    await sbFetch('service_types',{
+      method:'POST',
+      headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify(rows)
+    });
     const data=await sbFetch('service_types?order=created_at.asc');
     if(data&&data.length){
       cacheSvcTypes(data);

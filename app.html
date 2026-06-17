@@ -1254,11 +1254,13 @@ async function sbFetch(path,opts={}){
   if(!sbUrl||!sbKey)return null;
   const extraHeaders=opts.headers||{};
   const {headers:_,...restOpts}=opts;
+  // Use auth token if user is logged in, otherwise use anon key
+  const authHeader=window._sbAuthToken?`Bearer ${window._sbAuthToken}`:`Bearer ${sbKey}`;
   const r=await fetch(sbUrl+'/rest/v1/'+path,{
     ...restOpts,
     headers:{
       'apikey':sbKey,
-      'Authorization':`Bearer ${sbKey}`,
+      'Authorization':authHeader,
       'Content-Type':'application/json',
       'Prefer':'return=representation',
       ...extraHeaders
@@ -2914,14 +2916,7 @@ document.addEventListener('keydown', function(e){
   }
 });
 
-// Update sbFetch to include auth token
-const _origSbFetch = sbFetch;
-async function sbFetch(path, opts={}){
-  if(window._sbAuthToken){
-    opts = {...opts, headers:{...opts.headers, 'Authorization': 'Bearer '+window._sbAuthToken}};
-  }
-  return _origSbFetch(path, opts);
-}
+// sbFetch auth handled inline
 
 // Override init — wait for auth before loading data
 window.addEventListener('load', ()=>{

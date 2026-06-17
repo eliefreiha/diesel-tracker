@@ -262,7 +262,6 @@ tr:hover td{background:var(--surface2)}
 #fab-add:hover{transform:scale(1.08);box-shadow:0 6px 20px rgba(26,39,68,.4)}
 #fab-add:active{transform:scale(.95)}
 /* Add panel */
-#add-panel.open{transform:translateX(0)!important}
 /* Settings sub-tabs */
 .settings-sub{display:none}.settings-sub.active{display:block}
 /* Stock mini bar badges */
@@ -302,20 +301,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- LOG -->
 <!-- FAB Add Button -->
-<button id="fab-add" onclick="openAddPanel()" title="Add entry" style="position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--navy);color:#fff;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(26,39,68,.35);z-index:150;display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s">+</button>
-
-<!-- ADD ENTRY PANEL -->
-<div id="add-overlay" onclick="closeAddPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200"></div>
-<div id="add-panel" style="position:fixed;right:0;top:0;bottom:0;width:min(480px,100%);background:var(--surface);z-index:201;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.12)">
-  <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--surface);z-index:1">
-    <span style="font-size:16px;font-weight:600;flex:1">New entry</span>
-    <button onclick="closeAddPanel()" style="background:var(--surface2);border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--text);display:grid;place-items:center">✕</button>
-  </div>
-  <div style="padding:20px;flex:1">
-    <!-- Add entry form content moved here -->
-    <div id="add-panel-content"></div>
-  </div>
-</div>
+<button id="fab-add" onclick="openAddModal()" title="Add entry" style="position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--navy);color:#fff;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(26,39,68,.35);z-index:150;display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s">+</button>
 
 <div id="page-log" class="page active">
   <!-- Stock mini bar -->
@@ -365,10 +351,13 @@ tr:hover td{background:var(--surface2)}
 </div>
 
 <!-- ADD -->
-<div id="page-add" class="page">
-  <div class="warn" id="stock-warn"></div>
-  <div class="form-card">
-    <div class="sec-title" style="margin-bottom:13px">New entry</div>
+<!-- ADD ENTRY MODAL -->
+<div class="modal-bg" id="add-modal">
+  <div class="modal" style="max-width:600px;max-height:92vh;overflow-y:auto">
+    <div class="modal-hdr">
+      <div class="modal-ttl">New entry</div>
+      <button class="modal-x" onclick="closeModal('add-modal')">✕</button>
+    </div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="fg" style="margin-bottom:0"><label>Date *</label><input type="date" id="inp-date"></div>
       <div class="fg" style="margin-bottom:0"><label>Type *</label>
@@ -390,9 +379,8 @@ tr:hover td{background:var(--surface2)}
       </div>
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="inp-notes" placeholder="Optional"></div>
     </div>
-
     <div class="odo-section" id="odo-section">
-      <div class="odo-title">🚗 Nissan — fill details</div>
+      <div class="odo-title">🚗 Fill details</div>
       <div class="form-row-3" style="margin-bottom:8px">
         <div class="fg" style="margin-bottom:0"><label>Odometer (km)</label>
           <input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()">
@@ -405,7 +393,7 @@ tr:hover td{background:var(--surface2)}
           </div>
           <span class="hint green" id="actual-lt-hint"></span>
         </div>
-        <div class="fg" style="margin-bottom:0;justify-content:flex-end">
+        <div class="fg" style="margin-bottom:0">
           <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding-top:20px">
             <input type="checkbox" id="inp-full-fill" style="width:15px;height:15px;cursor:pointer" checked>
             <span style="font-size:13px;font-weight:500">🔵 Full fill</span>
@@ -432,21 +420,18 @@ tr:hover td{background:var(--surface2)}
         </div>
       </div>
     </div>
-
+    <div class="warn" id="stock-warn"></div>
     <div class="sec-title" style="margin-bottom:8px">Vouchers</div>
     <div class="v-grid">
-      <div class="v-wrap">
-        <span class="v-lbl t10">10L</span>
+      <div class="v-wrap"><span class="v-lbl t10">10L</span>
         <input type="number" id="inp-v10" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
         <span class="v-sub" id="stock-show-10"></span>
       </div>
-      <div class="v-wrap">
-        <span class="v-lbl t20">20L</span>
+      <div class="v-wrap"><span class="v-lbl t20">20L</span>
         <input type="number" id="inp-v20" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
         <span class="v-sub" id="stock-show-20"></span>
       </div>
-      <div class="v-wrap">
-        <span class="v-lbl t30">30L</span>
+      <div class="v-wrap"><span class="v-lbl t30">30L</span>
         <input type="number" id="inp-v30" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
         <span class="v-sub" id="stock-show-30"></span>
       </div>
@@ -456,18 +441,14 @@ tr:hover td{background:var(--surface2)}
       <span style="color:var(--border2)">·</span>
       <span class="vtv" id="voucher-total-tanks">0.0 tanks</span>
     </div>
-    <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
       <button class="btn btn-p" onclick="addEntry()">Add entry</button>
       <span id="add-preview" style="font-size:12px;color:var(--text2)"></span>
     </div>
   </div>
-  <div class="form-card" style="background:var(--surface2)">
-    <div class="sec-title" style="margin-bottom:5px">Voucher values · 1 tank = 20L</div>
-    <p style="font-size:12px;color:var(--text2);line-height:1.7"><strong>10L = 10 liters · 20L = 20 liters · 30L = 30 liters</strong><br>Received / Purchase adds stock. Others subtract. Cannot exceed available stock.</p>
-  </div>
 </div>
 
-<!-- STOCK -->
+
 <div id="page-stock" class="page">
   <div class="sec-title">Current stock</div>
   <div class="stock-grid" id="stock-grid"></div>
@@ -2492,41 +2473,35 @@ setTimeout(function(){
 },2000);
 
 // ── FAB Panel ──
-function openAddPanel(){
-  document.getElementById('add-overlay').style.display='block';
-  document.getElementById('add-panel').classList.add('open');
-  // Move add form content into panel (only first time)
-  const form=document.getElementById('page-add');
-  const panel=document.getElementById('add-panel-content');
-  if(form&&panel&&!panel.hasChildNodes()){
-    [...form.children].forEach(c=>panel.appendChild(c));
-  }
-  const vehs=getVehicles();
-  console.log('DEBUG openAddPanel: vehicles=',JSON.stringify(vehs));
-  // Set type
-  const typeEl=document.getElementById('inp-type');
-  if(typeEl) typeEl.value='تعبئة';
-  // Update datalist
+function openAddModal(){
+  // Set today's date
+  const di=document.getElementById('inp-date');
+  if(di) di.value=new Date().toISOString().split('T')[0];
+  // Set type to car fill
+  const ti=document.getElementById('inp-type');
+  if(ti) ti.value='تعبئة';
+  // Update datalist with vehicles
   const dl=document.getElementById('persons-datalist');
-  if(dl){
-    dl.innerHTML=vehs.map(v=>'<option value="'+vehLabel(v)+'">').join('');
-    console.log('DEBUG datalist options:',dl.innerHTML);
-  }
-  // Set person
-  const personEl=document.getElementById('inp-person');
-  if(personEl){
-    personEl.value=vehs.length?vehLabel(vehs[0]):'';
-    console.log('DEBUG person value set to:',personEl.value);
-  }
-  // Show odo
+  const vehs=getVehicles();
+  if(dl) dl.innerHTML=vehs.map(v=>'<option value="'+vehLabel(v)+'">').join('');
+  // Set person to first vehicle
+  const pi=document.getElementById('inp-person');
+  if(pi) pi.value=vehs.length?vehLabel(vehs[0]):'';
+  // Show odo section
   const sec=document.getElementById('odo-section');
-  if(sec){
-    sec.classList.add('visible');sec.classList.remove('hidden');
-    console.log('DEBUG odo-section classes:',sec.className);
-  }
-  prefillAddEntry();
+  if(sec){sec.classList.add('visible');sec.classList.remove('hidden');}
+  // Reset vouchers
+  ['inp-v10','inp-v20','inp-v30'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=0;});
+  // Sync quick settings & odo
   syncQuickNissanSettings&&syncQuickNissanSettings();
+  updateOdoPreview&&updateOdoPreview();
+  updateVoucherTotal&&updateVoucherTotal();
+  updateStockLabels&&updateStockLabels();
+  // Open modal
+  document.getElementById('add-modal').classList.add('open');
 }
+function openAddPanel(){openAddModal();}
+function closeAddPanel(){closeModal('add-modal');}
 function closeAddPanel(){
   document.getElementById('add-overlay').style.display='none';
   document.getElementById('add-panel').classList.remove('open');

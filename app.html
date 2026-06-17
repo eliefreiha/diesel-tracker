@@ -2893,235 +2893,51 @@ function fcSave(){
 async function fcFetchPrice(){
   const btn=document.getElementById('fetch-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳...';}
-  const pdot=document.getElementById('pdot');const ps=document.getElementById('pstatus');
-  if(pdot)pdot.className='conn-dot loading';if(ps)ps.textContent='Fetching...';
+  const pdot=document.getElementById('pdot');
+  const ps=document.getElementById('pstatus');
+  if(pdot)pdot.className='conn-dot loading';
+  if(ps)ps.textContent='Fetching...';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:200,tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:'Current price of 95 octane per 20L صفيحة in Lebanon LBP today. Return ONLY JSON: {"price20":2350000,"date":"17 Jun 2026","source":"IPT"}'}]})});
-    const d=await res.json();
-    let txt='';for(const b of(d.content||[])){if(b.type==='text'){txt=b.text;break;}}
-    const m=txt.match(/\{[^}]+\}/);
-    if(m){const parsed=JSON.parse(m[0]);if(parsed.price20&&parsed.price20>500000){
-      const inp=document.getElementById('fc-price20');if(inp)inp.value=parsed.price20;
-      fcAutoFetched=true;fcLastPriceDate=parsed.date||'today';fcLastPriceSrc=parsed.source||'web';
-      const hint=document.getElementById('price-hint');if(hint)hint.textContent='Auto-fetched · '+fcLastPriceDate+' · '+fcLastPriceSrc;
-      if(pdot)pdot.className='conn-dot online';if(ps)ps.textContent='Live · '+fcLastPriceSrc;
-      const pu=document.getElementById('pupdate');if(pu){pu.textContent='Updated: '+fcLastPriceDate;pu.style.display='inline';}
-      fcRecalc();fcSave();
-      if(btn){btn.textContent='✓';setTimeout(()=>{btn.textContent='🔄 Refresh';btn.disabled=false;},2000);}
-      return;
-    }}
-    throw new Error('parse failed');
+    // Try allorigins proxy to fetch IPT fuel prices
+    const url='https://api.allorigins.win/get?url='+encodeURIComponent('https://www.iptgroup.com.lb/ipt/en/our-stations/fuel-prices');
+    const res=await fetch(url);
+    const data=await res.json();
+    const txt=data.contents||'';
+    // Look for price pattern in HTML - IPT shows price like 2,350,000 or 2350000
+    const match=txt.match(/95[^<]*?([\d,]{7,10})\s*LBP/i)||
+                 txt.match(/Octane[^<]*?([\d,]{7,10})/i)||
+                 txt.match(/([\d,]{7,10})\s*LBP[^<]*?95/i);
+    if(match){
+      const price=parseInt(match[1].replace(/,/g,''));
+      if(price>500000&&price<10000000){
+        const inp=document.getElementById('fc-price20');
+        if(inp) inp.value=price;
+        fcAutoFetched=true;
+        fcLastPriceDate=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+        fcLastPriceSrc='IPT';
+        const hint=document.getElementById('price-hint');
+        if(hint) hint.textContent='Auto-fetched · '+fcLastPriceDate+' · IPT';
+        if(pdot)pdot.className='conn-dot online';
+        if(ps)ps.textContent='Live · IPT';
+        const pu=document.getElementById('pupdate');
+        if(pu){pu.textContent='Updated: '+fcLastPriceDate;pu.style.display='inline';}
+        // Save to Supabase
+        try{await sbFetch('app_settings',{method:'POST',
+          headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+          body:JSON.stringify({key:'fuel_price_20_lbp',value:{price,date:fcLastPriceDate}})
+        });}catch(e){}
+        fcRecalc();fcSave();
+        if(btn){btn.textContent='✓';setTimeout(()=>{btn.textContent='🔄 Fetch price';btn.disabled=false;},2000);}
+        return;
+      }
+    }
+    throw new Error('Could not parse price from IPT');
   }catch(e){
-    if(pdot)pdot.className='conn-dot offline';if(ps)ps.textContent='Auto-fetch failed — showing saved';
-    if(btn){btn.textContent='🔄 Retry';btn.disabled=false;}
+    console.warn('Auto-fetch failed:',e.message);
+    // Show saved price
+    if(pdot)pdot.className='conn-dot offline';
+    if(ps)ps.textContent='Auto-fetch failed — showing saved';
+    if(btn){btn.disabled=false;btn.textContent='🔄 Retry';}
   }
 }
-function fcInit(){
-  // Load from localStorage first and render immediately
-  try{
-    const s=JSON.parse(localStorage.getItem(FC_LS)||'{}');
-    const sharedFee=localStorage.getItem('diesel_fee_lbp_per20');
-    const sharedPrice=localStorage.getItem('diesel_fuel_price_20');
-    const inp20=document.getElementById('fc-price20');
-    const inpFee=document.getElementById('fc-fee-lbp');
-    if(inp20&&(sharedPrice||s.price20)) inp20.value=sharedPrice||s.price20;
-    else if(inp20&&!inp20.value) inp20.value=2350000;
-    if(inpFee&&(sharedFee||s.deductLbp!==undefined)) inpFee.value=sharedFee||s.deductLbp;
-    else if(inpFee&&!inpFee.value) inpFee.value=getNissanFeeLbp?getNissanFeeLbp():115000;
-  }catch(e){}
-  // Render table immediately with current values
-  fcRecalc();
-  // Load from Supabase
-  if(sbUrl&&sbKey){
-    Promise.all([sbGetSetting('fuel_fee_lbp'),sbGetSetting('fuel_price_20_lbp')]).then(([fee,price])=>{
-      let changed=false;
-      const inpFee=document.getElementById('fc-fee-lbp');
-      const inp20=document.getElementById('fc-price20');
-      if(fee&&parseFloat(fee)>0&&inpFee){inpFee.value=fee;changed=true;}
-      if(price&&parseFloat(price)>0&&inp20){inp20.value=price;changed=true;}
-      fcRecalc(); // Always recalc after Supabase load
-      // Auto-fetch if price is stale (>6hrs)
-      try{const s=JSON.parse(localStorage.getItem(FC_LS)||'{}');
-        if(!s.fetchedAt||(Date.now()-s.fetchedAt)>6*3600*1000) fcFetchPrice();
-      }catch(e){fcFetchPrice();}
-    });
-  } else {
-    try{const s=JSON.parse(localStorage.getItem(FC_LS)||'{}');
-      if(!s.fetchedAt||(Date.now()-s.fetchedAt)>6*3600*1000) fcFetchPrice();
-    }catch(e){fcFetchPrice();}
-  }
-  fcRecalc(); // Always recalc at end of init
-}
-
-// ══════════════════════════════════════════
-// AUTH MODULE
-// ══════════════════════════════════════════
-let currentUser = null;
-
-function showAuthTab(tab, btn){
-  document.getElementById('auth-login').style.display = tab==='login'?'':'none';
-  document.getElementById('auth-signup').style.display = tab==='signup'?'':'none';
-  document.querySelectorAll('.auth-tab').forEach(b=>b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-}
-
-async function sbAuth(endpoint, body){
-  const r = await fetch(sbUrl+'/auth/v1/'+endpoint, {
-    method: 'POST',
-    headers: {'apikey': sbKey, 'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
-  });
-  return r.json();
-}
-
-async function doLogin(){
-  const email = document.getElementById('login-email').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const msg = document.getElementById('login-msg');
-  const btn = document.getElementById('login-btn');
-  if(!email||!pass){msg.className='auth-msg error';msg.textContent='Please fill all fields';return;}
-  btn.disabled=true; btn.textContent='Signing in...'; msg.textContent='';
-  try{
-    const data = await sbAuth('token?grant_type=password', {email, password: pass});
-    if(data.error){msg.className='auth-msg error';msg.textContent=data.error_description||data.error;btn.disabled=false;btn.textContent='Sign in';return;}
-    await onAuthSuccess(data);
-  }catch(e){msg.className='auth-msg error';msg.textContent='Connection error';btn.disabled=false;btn.textContent='Sign in';}
-}
-
-async function doSignup(){
-  const name = document.getElementById('signup-name').value.trim();
-  const email = document.getElementById('signup-email').value.trim();
-  const pass = document.getElementById('signup-pass').value;
-  const msg = document.getElementById('signup-msg');
-  const btn = document.getElementById('signup-btn');
-  if(!name||!email||!pass){msg.className='auth-msg error';msg.textContent='Please fill all fields';return;}
-  if(pass.length<6){msg.className='auth-msg error';msg.textContent='Password must be at least 6 characters';return;}
-  btn.disabled=true; btn.textContent='Creating account...'; msg.textContent='';
-  try{
-    const data = await sbAuth('signup', {email, password: pass, data:{name}});
-    if(data.error){msg.className='auth-msg error';msg.textContent=data.error_description||data.error;btn.disabled=false;btn.textContent='Create account';return;}
-    if(data.access_token){
-      await onAuthSuccess(data);
-    } else {
-      msg.className='auth-msg success';
-      msg.textContent='✓ Account created! Check your email to confirm, then sign in.';
-      btn.disabled=false; btn.textContent='Create account';
-    }
-  }catch(e){msg.className='auth-msg error';msg.textContent='Connection error';btn.disabled=false;btn.textContent='Create account';}
-}
-
-async function onAuthSuccess(data){
-  currentUser = data.user || data;
-  const token = data.access_token;
-  // Store session
-  try{localStorage.setItem('sb_session', JSON.stringify({token, user: currentUser}));}catch(e){}
-  // Update sbFetch to use auth token
-  window._sbAuthToken = token;
-  // Clear all cached data so we load fresh from Supabase for this user
-  // (keep sb_session so user stays logged in on refresh)
-  ['diesel_vehicles_v1','diesel_maintenance_v2','diesel_svc_types_v2',
-   'diesel_tracker_v4','fuel_calc_v5'].forEach(k=>localStorage.removeItem(k));
-  // Hide auth screen
-  document.getElementById('auth-screen').classList.add('hidden');
-  // Update header with user name
-  const name = currentUser.user_metadata?.name || currentUser.email;
-  const hdr = document.querySelector('.header-titles p');
-  if(hdr) hdr.textContent = '👤 '+name+' · Voucher management';
-  // Add logout button
-  addLogoutBtn();
-  // Load data
-  setConnStatus('loading','Loading your data...');
-  entries=[]; nextId=1;
-  renderAll();
-  try{
-    await loadFromSupabase();
-    renderAll();
-    updateStockMiniBar&&updateStockMiniBar();
-    await loadSettingsFromSupabase();
-    prefillAddEntry&&prefillAddEntry();
-    setTimeout(()=>renderReminders&&renderReminders(),600);
-  }catch(e){setConnStatus('offline','Load failed: '+e.message);}
-}
-
-function addLogoutBtn(){
-  const actions = document.querySelector('.header-actions');
-  if(!actions||document.getElementById('logout-btn')) return;
-  const btn = document.createElement('button');
-  btn.id='logout-btn'; btn.className='hbtn';
-  btn.innerHTML='↩ <span>Logout</span>';
-  btn.onclick = doLogout;
-  actions.appendChild(btn);
-}
-
-async function doLogout(){
-  if(!confirm('Sign out?')) return;
-  try{
-    await fetch(sbUrl+'/auth/v1/logout',{method:'POST',headers:{'apikey':sbKey,'Authorization':'Bearer '+window._sbAuthToken}});
-  }catch(e){}
-  localStorage.removeItem('sb_session');
-  window._sbAuthToken=null;
-  currentUser=null;
-  entries=[];
-  renderAll();
-  document.getElementById('auth-screen').classList.remove('hidden');
-  const logoutBtn=document.getElementById('logout-btn');
-  if(logoutBtn) logoutBtn.remove();
-}
-
-async function checkSession(){
-  // Try to restore session from localStorage
-  try{
-    const saved = JSON.parse(localStorage.getItem('sb_session')||'null');
-    if(saved&&saved.token){
-      // Verify token with timeout
-      const controller = new AbortController();
-      const timeout = setTimeout(()=>controller.abort(), 5000);
-      try{
-        const r = await fetch(sbUrl+'/auth/v1/user',{
-          headers:{'apikey':sbKey,'Authorization':'Bearer '+saved.token},
-          signal: controller.signal
-        });
-        clearTimeout(timeout);
-        if(r.ok){
-          const user = await r.json();
-          if(user.id){
-            await onAuthSuccess({...saved, user, access_token: saved.token});
-            return;
-          }
-        }
-      }catch(e){clearTimeout(timeout);}
-    }
-  }catch(e){}
-  // No valid session — show login
-  document.getElementById('auth-screen').classList.remove('hidden');
-}
-
-// Allow Enter key on auth forms
-document.addEventListener('keydown', function(e){
-  if(e.key==='Enter'){
-    const loginVisible = document.getElementById('auth-login').style.display!=='none';
-    if(loginVisible) doLogin();
-    else doSignup();
-  }
-});
-
-// sbFetch auth handled inline
-
-// Override init — wait for auth before loading data
-window.addEventListener('load', ()=>{
-  // Hide main app initially
-  document.getElementById('auth-screen').classList.remove('hidden');
-  // Check for existing session
-  if(sbUrl&&sbKey){
-    checkSession();
-  } else {
-    // No Supabase configured
-    document.getElementById('auth-screen').classList.add('hidden');
-  }
-});
-
-</script>
-</body>
-</html>
+>

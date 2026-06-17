@@ -385,8 +385,10 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="fg" style="margin-bottom:0"><label>Person / Vehicle</label>
-        <input type="text" id="inp-person" list="persons-list" placeholder="Type or choose..." oninput="onPersonChange()">
-        <datalist id="persons-list"></datalist>
+        <select id="inp-person" onchange="onPersonChange()" style="font-size:13px">
+          <option value="">Select...</option>
+        </select>
+        <input type="hidden" id="inp-person-custom" value="">
       </div>
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="inp-notes" placeholder="Optional"></div>
     </div>
@@ -484,6 +486,12 @@ tr:hover td{background:var(--surface2)}
 
 <!-- NISSAN -->
 <div id="page-nissan" class="page">
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <div class="sec-title" style="margin-bottom:0;flex:1">Vehicle fills</div>
+    <select id="nissan-vehicle-filter" class="fi" style="max-width:200px" onchange="renderNissan()">
+      <option value="">All vehicles</option>
+    </select>
+  </div>
   <div class="metrics" id="nissan-metrics"></div>
   <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:var(--rs);padding:9px 13px;font-size:11px;color:#854d0e;margin-bottom:12px">
     ⚡ <strong>km/20L is brim-to-brim</strong> — only between consecutive full fills 🔵. Historical fills default to Full. Edit partials to 🟡 for accurate readings.
@@ -831,7 +839,9 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="fg" style="margin-bottom:0"><label>Person / Vehicle</label>
-        <input type="text" id="edit-person" list="persons-list" placeholder="Type or choose..." oninput="onEditPersonChange()">
+        <select id="edit-person" onchange="onEditPersonChange()">
+          <option value="">Select...</option>
+        </select>
       </div>
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="edit-notes"></div>
     </div>
@@ -1022,6 +1032,9 @@ function saveNissanSettings(){
     sbSetSetting('nissan_settings',obj);
     sbSetSetting('fuel_fee_lbp',f);
   }
+  // Sync to fuel tab
+  const fcFeeEl=document.getElementById('fc-fee-lbp');
+  if(fcFeeEl){fcFeeEl.value=f;if(typeof fcRecalc==='function')fcRecalc();}
   refreshActualLtHint&&refreshActualLtHint();
   renderNissan&&renderNissan();
 }
@@ -1281,7 +1294,9 @@ function prefillAddEntry(){
   const personEl=document.getElementById('inp-person');
   if(!typeEl||!personEl) return;
   typeEl.value='تعبئة';
-  personEl.value=NISSAN_PERSON;
+  // Set to first vehicle or Nissan
+  const vehs=getVehicles();
+  personEl.value=vehs.length?vehs[0].name:NISSAN_PERSON;
 
   // Reset vouchers
   document.getElementById('inp-v10').value=0;
@@ -1383,16 +1398,21 @@ function getLastNissanOdo(){
   return fills.length?fills[fills.length-1]:null;
 }
 function onPersonChange(){
-  const person=document.getElementById('inp-person').value;
+  const personEl=document.getElementById('inp-person');
+  const person=personEl?personEl.value:'';
   const type=document.getElementById('inp-type').value;
   const sec=document.getElementById('odo-section');
-  if(isNissan(person)&&type==='تعبئة'){
-    // Reset vouchers when Nissan selected
+  // Show odo section for any vehicle (not just Nissan)
+  const isVehicle=getVehicles().some(v=>v.name===person)||isNissan(person);
+  if(isVehicle&&type==='تعبئة'){
     document.getElementById('inp-v10').value=0;
     document.getElementById('inp-v20').value=0;
     document.getElementById('inp-v30').value=0;
-    sec.classList.remove('hidden');sec.classList.add('visible');syncQuickNissanSettings();updateOdoPreview();
-  }else{sec.classList.add('hidden');sec.classList.remove('visible');}
+    sec.classList.remove('hidden');sec.classList.add('visible');
+    syncQuickNissanSettings();updateOdoPreview();
+  }else{
+    sec.classList.add('hidden');sec.classList.remove('visible');
+  }
   updateVoucherTotal();
 }
 function onTypeChange(){
@@ -1638,7 +1658,19 @@ function openEdit(id){
   editingId=id;
   document.getElementById('edit-date').value=e.dateStr;
   document.getElementById('edit-type').value=e.type;
-  document.getElementById('edit-person').value=e.person||'';
+  // Populate edit person dropdown
+  const ep=document.getElementById('edit-person');
+  if(ep){
+    const vehs=getVehicles();
+    const extras='<option value="الجيش">الجيش</option>'+
+      '<option value="كارول">كارول</option>'+
+      '<option value="مانويلا">مانويلا</option>'+
+      '<option value="بابا">بابا</option>'+
+      '<optgroup label="───────────"></optgroup>'+
+      vehs.map(v=>'<option value="'+v.name+'">🚗 '+v.name+'</option>').join('');
+    ep.innerHTML='<option value="">Select...</option>'+extras;
+    ep.value=e.person||'';
+  }
   document.getElementById('edit-v10').value=e.v10||0;
   document.getElementById('edit-v20').value=e.v20||0;
   document.getElementById('edit-v30').value=e.v30||0;
@@ -1693,8 +1725,9 @@ function renderNissan(){
   const deductPer20=getNissanDeduct();
 
   // Sort ALL Nissan fills by date ascending
+  const filterVeh=(document.getElementById('nissan-vehicle-filter')||{}).value||'';
   const fills=entries
-    .filter(e=>e.type==='تعبئة'&&isNissan(e.person))
+    .filter(e=>e.type==='تعبئة'&&(filterVeh?e.person===filterVeh:(isNissan(e.person)||getVehicles().some(v=>v.name===e.person))))
     .sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
 
   function effectiveLt(e){
@@ -2091,9 +2124,29 @@ function renderVehiclesList(){
   el.innerHTML=v.length?v.map(vh=>'<div class="veh-card"><span style="font-size:20px">'+( icons[vh.type]||'🚗')+'</span><div style="flex:1"><div style="font-size:14px;font-weight:600">'+vh.name+'</div><div style="font-size:11px;color:var(--text3)">'+[vh.year,vh.plate].filter(Boolean).join(' · ')+'</div></div><button class="btn-icon del" onclick="removeVehicle('+JSON.stringify(vh.id)+')">✕</button></div>').join(''):'<p style="font-size:13px;color:var(--text3)">No vehicles yet.</p>';
 }
 function refreshVehicleDropdowns(){
-  const v=getVehicles();const opts=v.map(vh=>'<option value="'+vh.id+'">'+vh.name+'</option>').join('');
-  const mv=document.getElementById('maint-vehicle');if(mv){const c=mv.value;mv.innerHTML='<option value="">Select vehicle...</option>'+opts;if([...mv.options].find(o=>o.value===c))mv.value=c;}
-  const sf=document.getElementById('svc-vehicle-filter');if(sf){const c=sf.value;sf.innerHTML='<option value="">All vehicles</option>'+opts;if([...sf.options].find(o=>o.value===c))sf.value=c;}
+  const v=getVehicles();
+  const opts=v.map(vh=>'<option value="'+vh.name+'">'+vh.name+'</option>').join('');
+  const vehOpts=v.map(vh=>'<option value="'+vh.id+'">'+vh.name+'</option>').join('');
+  // Main add entry person dropdown
+  const pp=document.getElementById('inp-person');
+  if(pp){
+    const cur=pp.value;
+    // Keep existing non-vehicle options (الجيش etc) + add vehicles
+    const extras='<option value="الجيش">الجيش</option>'+
+      '<option value="كارول">كارول</option>'+
+      '<option value="مانويلا">مانويلا</option>'+
+      '<option value="بابا">بابا</option>'+
+      '<optgroup label="───────────"></optgroup>'+
+      v.map(vh=>'<option value="'+vh.name+'">🚗 '+vh.name+'</option>').join('');
+    pp.innerHTML='<option value="">Select person / vehicle...</option>'+extras;
+    if([...pp.options].find(o=>o.value===cur)) pp.value=cur;
+  }
+  // Maintenance vehicle dropdown
+  const mv=document.getElementById('maint-vehicle');if(mv){const c=mv.value;mv.innerHTML='<option value="">Select vehicle...</option>'+vehOpts;if([...mv.options].find(o=>o.value===c))mv.value=c;}
+  // Service vehicle filter
+  const sf=document.getElementById('svc-vehicle-filter');if(sf){const c=sf.value;sf.innerHTML='<option value="">All vehicles</option>'+vehOpts;if([...sf.options].find(o=>o.value===c))sf.value=c;}
+  // Nissan tab vehicle filter
+  const nf=document.getElementById('nissan-vehicle-filter');if(nf){const c=nf.value;nf.innerHTML='<option value="">All vehicles</option>'+opts;if([...nf.options].find(o=>o.value===c))nf.value=c;}
 }
 
 const DEFAULT_SVC_TYPES2=[

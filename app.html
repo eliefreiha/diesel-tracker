@@ -2958,17 +2958,23 @@ async function checkSession(){
   try{
     const saved = JSON.parse(localStorage.getItem('sb_session')||'null');
     if(saved&&saved.token){
-      // Verify token is still valid
-      const r = await fetch(sbUrl+'/auth/v1/user',{
-        headers:{'apikey':sbKey,'Authorization':'Bearer '+saved.token}
-      });
-      if(r.ok){
-        const user = await r.json();
-        if(user.id){
-          await onAuthSuccess({...saved, user, access_token: saved.token});
-          return;
+      // Verify token with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(()=>controller.abort(), 5000);
+      try{
+        const r = await fetch(sbUrl+'/auth/v1/user',{
+          headers:{'apikey':sbKey,'Authorization':'Bearer '+saved.token},
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if(r.ok){
+          const user = await r.json();
+          if(user.id){
+            await onAuthSuccess({...saved, user, access_token: saved.token});
+            return;
+          }
         }
-      }
+      }catch(e){clearTimeout(timeout);}
     }
   }catch(e){}
   // No valid session — show login

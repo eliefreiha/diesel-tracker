@@ -937,18 +937,27 @@ async function bulkUpdateActualLt(){
 }
 
 function saveNissanSettings(){
-  const d=parseFloat(document.getElementById('nissan-deduct').value)||1;
-  const b=parseFloat(document.getElementById('nissan-base').value)||20;
-  const m=parseInt(document.getElementById('nissan-mode')?.value||2);
-  const f=parseFloat(document.getElementById('nissan-fee-lbp')?.value||115000);
+  const d=parseFloat((document.getElementById('nissan-deduct')||{}).value)||1;
+  const b=parseFloat((document.getElementById('nissan-base')||{}).value)||20;
+  const m=parseInt((document.getElementById('nissan-mode')||{}).value||2);
+  const f=parseFloat((document.getElementById('nissan-fee-lbp')||{}).value||115000);
   const obj={deduct:d,base:b,mode:m,feeLbp:f};
-  try{localStorage.setItem(LS_NISSAN,JSON.stringify(obj));}catch(e){}
+  try{
+    localStorage.setItem(LS_NISSAN,JSON.stringify(obj));
+    // Write to shared key so fuel calculator picks it up
+    localStorage.setItem('diesel_fee_lbp_per20',f);
+  }catch(e){}
   if(sbUrl&&sbKey) sbSetSetting('nissan_settings',obj);
-  refreshActualLtHint();
-  renderNissan();
+  refreshActualLtHint&&refreshActualLtHint();
+  renderNissan&&renderNissan();
 }
 function getNissanMode(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.mode||2;}catch(e){return 2;}}
-function getNissanFeeLbp(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.feeLbp||115000;}catch(e){return 115000;}}
+function getNissanFeeLbp(){
+  // First check shared key (set by fuel calculator)
+  const shared=localStorage.getItem('diesel_fee_lbp_per20');
+  if(shared&&parseFloat(shared)>0) return parseFloat(shared);
+  try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.feeLbp||115000;}catch(e){return 115000;}
+}
 function loadNissanSettings(){
   const d=getNissanDeduct(),b=getNissanBase(),m=getNissanMode(),f=getNissanFeeLbp();
   const el1=document.getElementById('nissan-deduct');

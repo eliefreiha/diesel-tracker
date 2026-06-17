@@ -1847,23 +1847,24 @@ function renderNissan(){
     const isFull=e.fullFill!==false;
 
     if(isFull&&e.odometer){
-      if(lastFullOdo!==null&&accumLt>0){
+      if(lastFullOdo!==null){
         const dist=e.odometer-lastFullOdo;
-        if(dist>0&&accumLt>0){
-          const eff=dist/accumLt*base;
+        // Use ONLY this fill's liters (not accumulated partials)
+        if(dist>0&&lt>0){
+          const eff=dist/lt*base;
           if(eff>0&&eff<2000&&isFinite(eff)){
             const effStr=eff.toFixed(1);
             effMap[e.id]=effStr;
-            accumMap[e.id]={dist,lt:accumLt.toFixed(1),eff:effStr,fromDate:lastFullDate};
+            accumMap[e.id]={dist,lt:lt.toFixed(1),eff:effStr,fromDate:lastFullDate};
           }
         }
       }
-      // Reset: this full fill starts a new accumulation period
+      // Reset: this full fill is the new baseline
       lastFullOdo=e.odometer;
       lastFullDate=e.dateStr;
-      accumLt=lt; // include this fill's liters for the NEXT period
+      accumLt=0;
     } else {
-      // Partial fill or no odo: add liters to accumulator
+      // Partial fill: track but don't use in calculation
       accumLt+=lt;
     }
   }

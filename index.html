@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2)}
   <div class="header-icon">⛽</div>
   <div class="header-titles">
     <h1>Diesel Tracker <span class="ver-tag">v2.2</span></h1>
-    <p>Voucher management · Nissan · Maintenance</p>
+    <p>Voucher management · Vehicles · Service</p>
   </div>
   <div class="header-actions">
     <div class="conn-pill"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting</span></div>
@@ -313,7 +313,7 @@ tr:hover td{background:var(--surface2)}
 <!-- NAV -->
 <nav class="nav">
   <button class="nav-btn active" id="nav-log" onclick="showPage('log',this)"><span class="ni">📋</span>Log</button>
-  <button class="nav-btn" id="nav-nissan" onclick="showPage('nissan',this)"><span class="ni">🚗</span>Nissan</button>
+  <button class="nav-btn" id="nav-nissan" onclick="showPage('nissan',this)"><span class="ni">🚗</span>Fills</button>
   <button class="nav-btn" id="nav-maintenance" onclick="showPage('maintenance',this)"><span class="ni">🔧</span>Service<span id="svc-badge" style="display:none;background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;margin-left:3px;vertical-align:top">!</span></button>
   <button class="nav-btn" id="nav-stats" onclick="showPage('stats',this)"><span class="ni">📊</span>Stats</button>
   <button class="nav-btn" id="nav-fuel" onclick="showPage('fuel',this)"><span class="ni">⛽</span>Fuel</button>
@@ -499,7 +499,7 @@ tr:hover td{background:var(--surface2)}
     ⚡ <strong>km/20L is brim-to-brim</strong> — only between consecutive full fills 🔵. Historical fills default to Full. Edit partials to 🟡 for accurate readings.
   </div>
   <div class="chart-box">
-    <div class="ct">🚗 Nissan efficiency — km per 20L</div>
+    <div class="ct">🚗 Vehicle efficiency — km per 20L</div>
     <div class="chart-wrap" style="height:200px"><canvas id="nissanChart"></canvas></div>
   </div>
   <div id="nissan-range-wrap"></div>
@@ -678,7 +678,7 @@ tr:hover td{background:var(--surface2)}
   <!-- Settings sub-tabs -->
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px">
     <button class="svc-tab active" onclick="showSettingsTab('operations',this)">⚙ Operations</button>
-    <button class="svc-tab" onclick="showSettingsTab('nissan-s',this)">🚗 Nissan</button>
+    <button class="svc-tab" onclick="showSettingsTab('nissan-s',this)">🚗 Vehicle</button>
     <button class="svc-tab" onclick="showSettingsTab('vehicles-s',this)">🚙 Vehicles</button>
   </div>
 
@@ -704,7 +704,7 @@ tr:hover td{background:var(--surface2)}
   <!-- NISSAN SUB-PAGE -->
   <div id="settings-nissan-s" class="settings-sub" style="display:none">
     <div class="form-card">
-      <div class="sec-title" style="margin-bottom:12px">🚗 Nissan Cash Fee</div>
+      <div class="sec-title" style="margin-bottom:12px">🚗 Vehicle Cash Fee</div>
       <p style="font-size:12px;color:var(--text2);margin-bottom:14px">The station takes this cash amount per 20L voucher instead of fuel. This is the same value used in the Fuel Calculator.</p>
       <div class="fg" style="max-width:280px">
         <label>Cash fee per 20L voucher (LBP)</label>
@@ -859,7 +859,7 @@ tr:hover td{background:var(--surface2)}
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="edit-notes"></div>
     </div>
     <div class="odo-section" id="edit-odo-section">
-      <div class="odo-title">🚗 Nissan — fill details</div>
+      <div class="odo-title">🚗 Fill details</div>
       <div class="form-row-3" style="margin-bottom:0">
         <div class="fg" style="margin-bottom:0"><label>Odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
         <div class="fg" style="margin-bottom:0"><label>Actual liters</label><input type="number" id="edit-actual-lt" placeholder="Auto" min="0" step="0.5"></div>
@@ -1442,7 +1442,12 @@ function updateStockLabels(){
 }
 
 // ── Odometer ──
-function isNissan(val){return (val||'').trim()===NISSAN_PERSON;}
+function isNissan(val){
+  const v=(val||'').trim();
+  // Check against NISSAN_PERSON or any saved vehicle name
+  if(v===NISSAN_PERSON) return true;
+  return getVehicles().some(vh=>vh.name===v||vehLabel(vh)===v);
+}
 function getLastNissanOdo(){
   const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
   return fills.length?fills[fills.length-1]:null;

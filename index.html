@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- v2.1.4 build 1781709371 -->
+<!-- v2.2 build 1781709371 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛽</text></svg>">
-<title>Diesel Tracker v2.1.4</title>
+<title>Diesel Tracker v2.2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 /* ── Reset ── */
@@ -268,16 +268,38 @@ tr:hover td{background:var(--surface2)}
 /* Stock mini bar badges */
 #sm-10{color:#854d0e}#sm-20{color:#1e40af}#sm-30{color:#065f46}
 
+/* ── AUTH ── */
+#auth-screen{position:fixed;inset:0;background:var(--navy);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{background:#fff;border-radius:16px;padding:32px;width:min(400px,96vw);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.auth-logo-icon{width:44px;height:44px;background:var(--navy);border-radius:10px;display:grid;place-items:center;font-size:22px}
+.auth-logo h1{font-size:18px;font-weight:700;color:var(--navy)}
+.auth-logo p{font-size:12px;color:#6b7280;margin-top:2px}
+.auth-tabs{display:flex;gap:0;margin-bottom:20px;background:#f3f4f6;border-radius:8px;padding:3px}
+.auth-tab{flex:1;padding:7px;font-size:13px;font-weight:500;border:none;background:transparent;cursor:pointer;border-radius:6px;color:#6b7280;transition:all .15s}
+.auth-tab.active{background:#fff;color:var(--navy);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.auth-fg{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.auth-fg label{font-size:12px;font-weight:600;color:#374151}
+.auth-fg input{font-size:14px;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;outline:none;width:100%;transition:border .15s}
+.auth-fg input:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(26,39,68,.08)}
+.auth-btn{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;transition:background .15s}
+.auth-btn:hover{background:#243562}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-msg{font-size:12px;margin-top:10px;text-align:center;min-height:18px}
+.auth-msg.error{color:#dc2626}
+.auth-msg.success{color:#059669}
+#auth-screen.hidden{display:none}
+
 </style>
 </head>
 <body>
 
-<div class="version-badge">v2.1.4</div>
+<div class="version-badge">v2.2</div>
 <!-- HEADER -->
 <header class="header">
   <div class="header-icon">⛽</div>
   <div class="header-titles">
-    <h1>Diesel Tracker <span class="ver-tag">v2.1.4</span></h1>
+    <h1>Diesel Tracker <span class="ver-tag">v2.2</span></h1>
     <p>Voucher management · Nissan · Maintenance</p>
   </div>
   <div class="header-actions">
@@ -905,6 +927,38 @@ tr:hover td{background:var(--surface2)}
       <button class="btn btn-sm" style="margin-left:auto" onclick="clearCacheReload()">🔄 Clear cache</button>
     </div>
     <p id="setup-msg" style="margin-top:10px;font-size:12px;color:var(--text2)"></p>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">⛽</div>
+      <div>
+        <h1>Diesel Tracker</h1>
+        <p>Voucher & vehicle management</p>
+      </div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="showAuthTab('login',this)">Sign in</button>
+      <button class="auth-tab" onclick="showAuthTab('signup',this)">Sign up</button>
+    </div>
+    <!-- Login -->
+    <div id="auth-login">
+      <div class="auth-fg"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="auth-fg"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="auth-btn" onclick="doLogin()" id="login-btn">Sign in</button>
+      <div class="auth-msg" id="login-msg"></div>
+    </div>
+    <!-- Signup -->
+    <div id="auth-signup" style="display:none">
+      <div class="auth-fg"><label>Name</label><input type="text" id="signup-name" placeholder="Your name"></div>
+      <div class="auth-fg"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="auth-fg"><label>Password</label><input type="password" id="signup-pass" placeholder="Min 6 characters" autocomplete="new-password"></div>
+      <button class="auth-btn" onclick="doSignup()" id="signup-btn">Create account</button>
+      <div class="auth-msg" id="signup-msg"></div>
+    </div>
   </div>
 </div>
 
@@ -2717,6 +2771,170 @@ function fcInit(){
   }
   fcRecalc(); // Always recalc at end of init
 }
+
+// ══════════════════════════════════════════
+// AUTH MODULE
+// ══════════════════════════════════════════
+let currentUser = null;
+
+function showAuthTab(tab, btn){
+  document.getElementById('auth-login').style.display = tab==='login'?'':'none';
+  document.getElementById('auth-signup').style.display = tab==='signup'?'':'none';
+  document.querySelectorAll('.auth-tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+}
+
+async function sbAuth(endpoint, body){
+  const r = await fetch(sbUrl+'/auth/v1/'+endpoint, {
+    method: 'POST',
+    headers: {'apikey': sbKey, 'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const msg = document.getElementById('login-msg');
+  const btn = document.getElementById('login-btn');
+  if(!email||!pass){msg.className='auth-msg error';msg.textContent='Please fill all fields';return;}
+  btn.disabled=true; btn.textContent='Signing in...'; msg.textContent='';
+  try{
+    const data = await sbAuth('token?grant_type=password', {email, password: pass});
+    if(data.error){msg.className='auth-msg error';msg.textContent=data.error_description||data.error;btn.disabled=false;btn.textContent='Sign in';return;}
+    await onAuthSuccess(data);
+  }catch(e){msg.className='auth-msg error';msg.textContent='Connection error';btn.disabled=false;btn.textContent='Sign in';}
+}
+
+async function doSignup(){
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass = document.getElementById('signup-pass').value;
+  const msg = document.getElementById('signup-msg');
+  const btn = document.getElementById('signup-btn');
+  if(!name||!email||!pass){msg.className='auth-msg error';msg.textContent='Please fill all fields';return;}
+  if(pass.length<6){msg.className='auth-msg error';msg.textContent='Password must be at least 6 characters';return;}
+  btn.disabled=true; btn.textContent='Creating account...'; msg.textContent='';
+  try{
+    const data = await sbAuth('signup', {email, password: pass, data:{name}});
+    if(data.error){msg.className='auth-msg error';msg.textContent=data.error_description||data.error;btn.disabled=false;btn.textContent='Create account';return;}
+    if(data.access_token){
+      await onAuthSuccess(data);
+    } else {
+      msg.className='auth-msg success';
+      msg.textContent='✓ Account created! Check your email to confirm, then sign in.';
+      btn.disabled=false; btn.textContent='Create account';
+    }
+  }catch(e){msg.className='auth-msg error';msg.textContent='Connection error';btn.disabled=false;btn.textContent='Create account';}
+}
+
+async function onAuthSuccess(data){
+  currentUser = data.user || data;
+  const token = data.access_token;
+  // Store session
+  try{localStorage.setItem('sb_session', JSON.stringify({token, user: currentUser}));}catch(e){}
+  // Update sbFetch to use auth token
+  window._sbAuthToken = token;
+  // Hide auth screen
+  document.getElementById('auth-screen').classList.add('hidden');
+  // Update header with user name
+  const name = currentUser.user_metadata?.name || currentUser.email;
+  const hdr = document.querySelector('.header-titles p');
+  if(hdr) hdr.textContent = '👤 '+name+' · Voucher management';
+  // Add logout button
+  addLogoutBtn();
+  // Load data
+  setConnStatus('loading','Loading your data...');
+  entries=[]; nextId=1;
+  renderAll();
+  try{
+    await loadFromSupabase();
+    renderAll();
+    updateStockMiniBar&&updateStockMiniBar();
+    await loadSettingsFromSupabase();
+    prefillAddEntry&&prefillAddEntry();
+    setTimeout(()=>renderReminders&&renderReminders(),600);
+  }catch(e){setConnStatus('offline','Load failed: '+e.message);}
+}
+
+function addLogoutBtn(){
+  const actions = document.querySelector('.header-actions');
+  if(!actions||document.getElementById('logout-btn')) return;
+  const btn = document.createElement('button');
+  btn.id='logout-btn'; btn.className='hbtn';
+  btn.innerHTML='↩ <span>Logout</span>';
+  btn.onclick = doLogout;
+  actions.appendChild(btn);
+}
+
+async function doLogout(){
+  if(!confirm('Sign out?')) return;
+  try{
+    await fetch(sbUrl+'/auth/v1/logout',{method:'POST',headers:{'apikey':sbKey,'Authorization':'Bearer '+window._sbAuthToken}});
+  }catch(e){}
+  localStorage.removeItem('sb_session');
+  window._sbAuthToken=null;
+  currentUser=null;
+  entries=[];
+  renderAll();
+  document.getElementById('auth-screen').classList.remove('hidden');
+  const logoutBtn=document.getElementById('logout-btn');
+  if(logoutBtn) logoutBtn.remove();
+}
+
+async function checkSession(){
+  // Try to restore session from localStorage
+  try{
+    const saved = JSON.parse(localStorage.getItem('sb_session')||'null');
+    if(saved&&saved.token){
+      // Verify token is still valid
+      const r = await fetch(sbUrl+'/auth/v1/user',{
+        headers:{'apikey':sbKey,'Authorization':'Bearer '+saved.token}
+      });
+      if(r.ok){
+        const user = await r.json();
+        if(user.id){
+          await onAuthSuccess({...saved, user, access_token: saved.token});
+          return;
+        }
+      }
+    }
+  }catch(e){}
+  // No valid session — show login
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+
+// Allow Enter key on auth forms
+document.addEventListener('keydown', function(e){
+  if(e.key==='Enter'){
+    const loginVisible = document.getElementById('auth-login').style.display!=='none';
+    if(loginVisible) doLogin();
+    else doSignup();
+  }
+});
+
+// Update sbFetch to include auth token
+const _origSbFetch = sbFetch;
+async function sbFetch(path, opts={}){
+  if(window._sbAuthToken){
+    opts = {...opts, headers:{...opts.headers, 'Authorization': 'Bearer '+window._sbAuthToken}};
+  }
+  return _origSbFetch(path, opts);
+}
+
+// Override init — wait for auth before loading data
+window.addEventListener('load', ()=>{
+  // Hide main app initially
+  document.getElementById('auth-screen').classList.remove('hidden');
+  // Check for existing session
+  if(sbUrl&&sbKey){
+    checkSession();
+  } else {
+    // No Supabase configured
+    document.getElementById('auth-screen').classList.add('hidden');
+  }
+});
 
 </script>
 </body>

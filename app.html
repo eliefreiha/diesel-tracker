@@ -2156,7 +2156,7 @@ const LS_MAINTENANCE2='diesel_maintenance_v2';
 const LS_SVC_TYPES2='diesel_svc_types_v2';
 
 // ── Vehicles — Supabase + localStorage cache ──
-function getVehicles(){try{const s=JSON.parse(localStorage.getItem(LS_VEHICLES)||'null');if(s&&s.length)return s;}catch(e){}return[{id:'nissan',name:'Nissan',plate:'',year:'',type:'suv'}];}
+function getVehicles(){try{const s=JSON.parse(localStorage.getItem(LS_VEHICLES)||'null');if(s)return s;}catch(e){}return[];}
 function cacheVehicles(v){try{localStorage.setItem(LS_VEHICLES,JSON.stringify(v));}catch(e){}}
 
 async function loadVehiclesFromSupabase(){
@@ -2177,7 +2177,10 @@ async function addVehicle(){
   const veh={id,name:n.value.trim(),plate:(document.getElementById('new-veh-plate')||{}).value||'',year:(document.getElementById('new-veh-year')||{}).value||'',type:(document.getElementById('new-veh-type')||{}).value||'car'};
   // Save to Supabase
   if(sbUrl&&sbKey){
-    try{await sbFetch('vehicles',{method:'POST',body:JSON.stringify(veh)});}
+    const uid=currentUser&&(currentUser.id||currentUser.sub);
+    const vehWithUser={...veh};
+    if(uid) vehWithUser.user_id=uid;
+    try{await sbFetch('vehicles',{method:'POST',body:JSON.stringify(vehWithUser)});}
     catch(e){console.warn('vehicle insert',e);}
   }
   // Update cache
@@ -2361,10 +2364,13 @@ async function seedDefaultSvcTypes(){
   console.log('Seeding default service types for new user...');
   try{
     for(const t of DEFAULT_SVC_TYPES2){
+      const uid=currentUser&&(currentUser.id||currentUser.sub);
+      const row={id:t.id+'_'+Date.now(),name:t.name,reminder:t.reminder,active:true};
+      if(uid) row.user_id=uid;
       await sbFetch('service_types',{
         method:'POST',
         headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},
-        body:JSON.stringify({id:t.id+'_'+Date.now(),name:t.name,reminder:t.reminder,active:true})
+        body:JSON.stringify(row)
       });
     }
     const data=await sbFetch('service_types?order=created_at.asc');
@@ -2428,7 +2434,9 @@ async function loadMaintenanceFromSupabase(){
   try{const data=await sbFetch('maintenance_entries?order=date_str.desc,id.desc&limit=1000');
   if(data){maintenanceEntries=data.map(r=>({id:r.id,dateStr:r.date_str,vehicleId:r.vehicle_id||'nissan',odometer:r.odometer,services:r.services||[],costs:r.costs||{},notes:r.notes||''}));saveMaintLocal();}}catch(e){console.warn('maint',e);}
 }
-async function sbInsertMaint(e){if(!sbUrl||!sbKey)return e;try{const body={date_str:e.dateStr,vehicle_id:e.vehicleId||null,odometer:e.odometer,services:e.services,costs:e.costs,notes:e.notes||null};const data=await sbFetch('maintenance_entries',{method:'POST',body:JSON.stringify(body)});if(data&&data[0])return{...e,id:data[0].id};}catch(err){}return e;}
+async function sbInsertMaint(e){if(!sbUrl||!sbKey)return e;try{const uid=currentUser&&(currentUser.id||currentUser.sub);
+  const body={date_str:e.dateStr,vehicle_id:e.vehicleId||null,odometer:e.odometer,services:e.services,costs:e.costs,notes:e.notes||null};
+  if(uid) body.user_id=uid;const data=await sbFetch('maintenance_entries',{method:'POST',body:JSON.stringify(body)});if(data&&data[0])return{...e,id:data[0].id};}catch(err){}return e;}
 async function sbUpdateMaint(e){if(!sbUrl||!sbKey)return;try{await sbFetch('maintenance_entries?id=eq.'+e.id,{method:'PATCH',body:JSON.stringify({date_str:e.dateStr,vehicle_id:e.vehicleId||null,odometer:e.odometer,services:e.services,costs:e.costs,notes:e.notes||null})});}catch(err){}}
 async function sbDeleteMaint(id){if(!sbUrl||!sbKey)return;try{await sbFetch('maintenance_entries?id=eq.'+id,{method:'DELETE'});}catch(err){}}
 

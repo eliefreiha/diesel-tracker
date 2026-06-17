@@ -2187,7 +2187,7 @@ async function saveVehicleEdit(id){
   if(!vh)return;
   const oldName=vh.name;
   Object.assign(vh,{name,plate,year,type});
-  saveVehicles(v);
+  cacheVehicles(v);
   if(sbUrl&&sbKey){
     try{await sbFetch('vehicles?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({name,plate,year,type})});}
     catch(e){console.warn('vehicle update',e);}

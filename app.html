@@ -290,6 +290,26 @@ tr:hover td{background:var(--surface2)}
 .auth-msg.success{color:#059669}
 #auth-screen.hidden{display:none}
 
+/* AUTH */
+#auth-screen{position:fixed;inset:0;background:var(--navy);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{background:#fff;border-radius:16px;padding:32px;width:min(400px,96vw);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.auth-logo-icon{width:44px;height:44px;background:var(--navy);border-radius:10px;display:grid;place-items:center;font-size:22px;color:#fff}
+.auth-logo h1{font-size:18px;font-weight:700;color:var(--navy);margin:0}
+.auth-logo p{font-size:12px;color:#6b7280;margin:2px 0 0}
+.auth-tabs{display:flex;gap:0;margin-bottom:20px;background:#f3f4f6;border-radius:8px;padding:3px}
+.auth-tab{flex:1;padding:7px;font-size:13px;font-weight:500;border:none;background:transparent;cursor:pointer;border-radius:6px;color:#6b7280}
+.auth-tab.active{background:#fff;color:var(--navy);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.auth-fg{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.auth-fg label{font-size:12px;font-weight:600;color:#374151}
+.auth-fg input{font-size:14px;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;outline:none;width:100%}
+.auth-fg input:focus{border-color:var(--navy)}
+.auth-btn{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-msg{font-size:12px;margin-top:10px;text-align:center;min-height:18px}
+.auth-msg.error{color:#dc2626}.auth-msg.success{color:#059669}
+#auth-screen.hidden{display:none}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -301,7 +321,7 @@ tr:hover td{background:var(--surface2)}
   <div class="header-icon">⛽</div>
   <div class="header-titles">
     <h1>Diesel Tracker <span class="ver-tag">v2.2.1</span></h1>
-    <p>Voucher management · Nissan · Maintenance</p>
+    <p>Voucher management · Vehicles · Service</p>
   </div>
   <div class="header-actions">
     <div class="conn-pill"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting</span></div>
@@ -862,7 +882,7 @@ tr:hover td{background:var(--surface2)}
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="edit-notes"></div>
     </div>
     <div class="odo-section" id="edit-odo-section">
-      <div class="odo-title">🚗 Nissan — fill details</div>
+      <div class="odo-title">🚗 Fill details</div>
       <div class="form-row-3" style="margin-bottom:0">
         <div class="fg" style="margin-bottom:0"><label>Odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
         <div class="fg" style="margin-bottom:0"><label>Actual liters</label><input type="number" id="edit-actual-lt" placeholder="Auto" min="0" step="0.5"></div>
@@ -934,22 +954,27 @@ tr:hover td{background:var(--surface2)}
 </div>
 
 <!-- AUTH SCREEN -->
-<div id="auth-screen" class="hidden">
+<div id="auth-screen">
   <div class="auth-box">
     <div class="auth-logo">
       <div class="auth-logo-icon">⛽</div>
-      <div><h1>Diesel Tracker</h1><p>Voucher & vehicle management</p></div>
+      <div>
+        <h1>Diesel Tracker</h1>
+        <p>Voucher & vehicle management</p>
+      </div>
     </div>
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="showAuthTab('login',this)">Sign in</button>
       <button class="auth-tab" onclick="showAuthTab('signup',this)">Sign up</button>
     </div>
+    <!-- Login -->
     <div id="auth-login">
       <div class="auth-fg"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"></div>
       <div class="auth-fg"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="auth-btn" onclick="doLogin()" id="login-btn">Sign in</button>
       <div class="auth-msg" id="login-msg"></div>
     </div>
+    <!-- Signup -->
     <div id="auth-signup" style="display:none">
       <div class="auth-fg"><label>Name</label><input type="text" id="signup-name" placeholder="Your name"></div>
       <div class="auth-fg"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email"></div>
@@ -966,7 +991,7 @@ tr:hover td{background:var(--surface2)}
 // ── Startup: always wipe stale local data ──
 (function(){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
-  try{const s=JSON.parse(localStorage.getItem('sb_session')||'null');if(s&&s.token)window._sbAuthToken=s.token;}catch(e){}
+  try{const _s=JSON.parse(localStorage.getItem('sb_session')||'null');if(_s&&_s.token)window._sbAuthToken=_s.token;}catch(e){}
 })();
 
 // ── Constants ──
@@ -1253,11 +1278,13 @@ async function sbFetch(path,opts={}){
   if(!sbUrl||!sbKey)return null;
   const extraHeaders=opts.headers||{};
   const {headers:_,...restOpts}=opts;
+  // Use auth token if user is logged in, otherwise use anon key
+  const authHeader=window._sbAuthToken?`Bearer ${window._sbAuthToken}`:`Bearer ${sbKey}`;
   const r=await fetch(sbUrl+'/rest/v1/'+path,{
     ...restOpts,
     headers:{
       'apikey':sbKey,
-      'Authorization':window._sbAuthToken?'Bearer '+window._sbAuthToken:'Bearer '+sbKey,
+      'Authorization':authHeader,
       'Content-Type':'application/json',
       'Prefer':'return=representation',
       ...extraHeaders
@@ -1443,6 +1470,7 @@ function updateStockLabels(){
 // ── Odometer ──
 function isNissan(val){
   const v=(val||'').trim();
+  // Check against NISSAN_PERSON or any saved vehicle name
   if(v===NISSAN_PERSON) return true;
   return getVehicles().some(vh=>vh.name===v||vehLabel(vh)===v);
 }
@@ -1602,9 +1630,7 @@ function updateOdoPreview(){
 function onEditPersonChange(){
   const person=document.getElementById('edit-person').value;
   const type=document.getElementById('edit-type').value;
-  const _isVeh2=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);
-  const _es2=document.getElementById('edit-odo-section');
-  if(_es2){if(_isVeh2&&type==='تعبئة'){_es2.classList.add('visible');_es2.classList.remove('hidden');}else{_es2.classList.remove('visible');_es2.classList.add('hidden');}}
+  const _iv2=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);const _es2=document.getElementById('edit-odo-section');if(_es2){if(_iv2&&type==='تعبئة'){_es2.classList.add('visible');_es2.classList.remove('hidden');}else{_es2.classList.remove('visible');_es2.classList.add('hidden');}}
 }
 function onEditTypeChange(){onEditPersonChange();}
 
@@ -1743,9 +1769,7 @@ function openEdit(id){
   document.getElementById('edit-actual-lt').value=e.actualLt||'';
   if(document.getElementById('edit-full-fill')) document.getElementById('edit-full-fill').checked=e.fullFill!==false;
   document.getElementById('edit-notes').value=e.notes||'';
-  const _isVeh=getVehicles().some(v=>v.name===e.person||vehLabel(v)===e.person)||isNissan(e.person);
-  const _es=document.getElementById('edit-odo-section');
-  if(_es){if(_isVeh&&e.type==='تعبئة'){_es.classList.add('visible');_es.classList.remove('hidden');}else{_es.classList.remove('visible');_es.classList.add('hidden');}}
+  const _iv=getVehicles().some(v=>v.name===e.person||vehLabel(v)===e.person)||isNissan(e.person);const _es=document.getElementById('edit-odo-section');if(_es){if(_iv&&e.type==='تعبئة'){_es.classList.add('visible');_es.classList.remove('hidden');}else{_es.classList.remove('visible');_es.classList.add('hidden');}}
   document.getElementById('edit-modal').classList.add('open');
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');editingId=null;}
@@ -1859,9 +1883,7 @@ function renderNissan(){
     const lastFull=fullFillsWithOdo[fullFillsWithOdo.length-1];
     overallDist=lastFull.odometer-firstFull.odometer;
     overallLt=effectiveLt(lastFull);
-    if(overallLt>0&&overallDist>0){
-      overallEff=(overallDist/overallLt*base).toFixed(1);
-    }
+    if(overallLt>0&&overallDist>0){overallEff=(overallDist/overallLt*base).toFixed(1);}
   }
 
   document.getElementById('nissan-metrics').innerHTML=`
@@ -2157,7 +2179,12 @@ async function loadVehiclesFromSupabase(){
   if(!sbUrl||!sbKey)return;
   try{
     const data=await sbFetch('vehicles?order=created_at.asc');
-    if(data&&data.length){cacheVehicles(data);renderVehiclesList();refreshVehicleDropdowns();}
+    if(data&&data.length){
+      cacheVehicles(data);
+      renderVehiclesList&&renderVehiclesList();
+      refreshVehicleDropdowns&&refreshVehicleDropdowns();
+    }
+    // No seeding for vehicles — new users add their own
   }catch(e){console.warn('vehicles load',e);}
 }
 async function addVehicle(){
@@ -2166,9 +2193,9 @@ async function addVehicle(){
   const veh={id,name:n.value.trim(),plate:(document.getElementById('new-veh-plate')||{}).value||'',year:(document.getElementById('new-veh-year')||{}).value||'',type:(document.getElementById('new-veh-type')||{}).value||'car'};
   // Save to Supabase
   if(sbUrl&&sbKey){
-    const _uid=currentUser&&(currentUser.id||currentUser.sub);
-    const _veh={...veh};if(_uid)_veh.user_id=_uid;
-    try{await sbFetch('vehicles',{method:'POST',body:JSON.stringify(_veh)});}
+    const _uid2=currentUser&&(currentUser.id||currentUser.sub);
+    const _v2={...veh};if(_uid2)_v2.user_id=_uid2;
+    try{await sbFetch('vehicles',{method:'POST',body:JSON.stringify(_v2)});}
     catch(e){console.warn('vehicle insert',e);}
   }
   // Update cache
@@ -2338,21 +2365,32 @@ async function loadSvcTypesFromSupabase(){
   if(!sbUrl||!sbKey)return;
   try{
     const data=await sbFetch('service_types?order=created_at.asc');
-    if(data&&data.length){cacheSvcTypes(data);renderServiceTypesList();}
-    else{
-      // No custom types in DB — seed defaults
+    if(data&&data.length){
+      cacheSvcTypes(data);
+      renderServiceTypesList&&renderServiceTypesList();
+    } else {
+      // New user — seed default service types
       await seedDefaultSvcTypes();
     }
   }catch(e){console.warn('svc_types load',e);}
 }
 async function seedDefaultSvcTypes(){
   if(!sbUrl||!sbKey)return;
+  console.log('Seeding default service types for new user...');
   try{
     for(const t of DEFAULT_SVC_TYPES2){
-      await sbFetch('service_types',{method:'POST',headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({id:t.id,name:t.name,reminder:t.reminder})});
+      await sbFetch('service_types',{
+        method:'POST',
+        headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},
+        body:JSON.stringify({id:t.id+'_'+Date.now(),name:t.name,reminder:t.reminder,active:true})
+      });
     }
     const data=await sbFetch('service_types?order=created_at.asc');
-    if(data&&data.length) cacheSvcTypes(data);
+    if(data&&data.length){
+      cacheSvcTypes(data);
+      renderServiceTypesList&&renderServiceTypesList();
+      console.log('Default service types seeded ✓');
+    }
   }catch(e){console.warn('seed svc types',e);}
 }
 async function addServiceType(){
@@ -2780,63 +2818,81 @@ function fcInit(){
 // ══════════════════════════════════════════
 let currentUser = null;
 
-function showAuthTab(tab,btn){
-  document.getElementById('auth-login').style.display=tab==='login'?'':'none';
-  document.getElementById('auth-signup').style.display=tab==='signup'?'':'none';
+function showAuthTab(tab, btn){
+  document.getElementById('auth-login').style.display = tab==='login'?'':'none';
+  document.getElementById('auth-signup').style.display = tab==='signup'?'':'none';
   document.querySelectorAll('.auth-tab').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
+  if(btn) btn.classList.add('active');
 }
 
-async function sbAuth(endpoint,body){
-  const r=await fetch(sbUrl+'/auth/v1/'+endpoint,{method:'POST',headers:{'apikey':sbKey,'Content-Type':'application/json'},body:JSON.stringify(body)});
+async function sbAuth(endpoint, body){
+  const r = await fetch(sbUrl+'/auth/v1/'+endpoint, {
+    method: 'POST',
+    headers: {'apikey': sbKey, 'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
   return r.json();
 }
 
 async function doLogin(){
-  const email=document.getElementById('login-email').value.trim();
-  const pass=document.getElementById('login-pass').value;
-  const msg=document.getElementById('login-msg');
-  const btn=document.getElementById('login-btn');
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const msg = document.getElementById('login-msg');
+  const btn = document.getElementById('login-btn');
   if(!email||!pass){msg.className='auth-msg error';msg.textContent='Please fill all fields';return;}
-  btn.disabled=true;btn.textContent='Signing in...';msg.textContent='';
+  btn.disabled=true; btn.textContent='Signing in...'; msg.textContent='';
   try{
-    const data=await sbAuth('token?grant_type=password',{email,password:pass});
+    const data = await sbAuth('token?grant_type=password', {email, password: pass});
     if(data.error){msg.className='auth-msg error';msg.textContent=data.error_description||data.error;btn.disabled=false;btn.textContent='Sign in';return;}
     await onAuthSuccess(data);
   }catch(e){msg.className='auth-msg error';msg.textContent='Connection error';btn.disabled=false;btn.textContent='Sign in';}
 }
 
 async function doSignup(){
-  const name=document.getElementById('signup-name').value.trim();
-  const email=document.getElementById('signup-email').value.trim();
-  const pass=document.getElementById('signup-pass').value;
-  const msg=document.getElementById('signup-msg');
-  const btn=document.getElementById('signup-btn');
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass = document.getElementById('signup-pass').value;
+  const msg = document.getElementById('signup-msg');
+  const btn = document.getElementById('signup-btn');
   if(!name||!email||!pass){msg.className='auth-msg error';msg.textContent='Please fill all fields';return;}
   if(pass.length<6){msg.className='auth-msg error';msg.textContent='Password must be at least 6 characters';return;}
-  btn.disabled=true;btn.textContent='Creating account...';msg.textContent='';
+  btn.disabled=true; btn.textContent='Creating account...'; msg.textContent='';
   try{
-    const data=await sbAuth('signup',{email,password:pass,data:{name}});
+    const data = await sbAuth('signup', {email, password: pass, data:{name}});
     if(data.error){msg.className='auth-msg error';msg.textContent=data.error_description||data.error;btn.disabled=false;btn.textContent='Create account';return;}
-    if(data.access_token){await onAuthSuccess(data);}
-    else{msg.className='auth-msg success';msg.textContent='Account created! You can now sign in.';btn.disabled=false;btn.textContent='Create account';}
+    if(data.access_token){
+      await onAuthSuccess(data);
+    } else {
+      msg.className='auth-msg success';
+      msg.textContent='✓ Account created! Check your email to confirm, then sign in.';
+      btn.disabled=false; btn.textContent='Create account';
+    }
   }catch(e){msg.className='auth-msg error';msg.textContent='Connection error';btn.disabled=false;btn.textContent='Create account';}
 }
 
 async function onAuthSuccess(data){
-  currentUser=data.user||data;
-  const token=data.access_token;
-  try{localStorage.setItem('sb_session',JSON.stringify({token,user:currentUser}));}catch(e){}
-  window._sbAuthToken=token;
-  // Clear cached data for this user
-  ['diesel_vehicles_v1','diesel_maintenance_v2','diesel_svc_types_v2','diesel_tracker_v4','fuel_calc_v5'].forEach(k=>localStorage.removeItem(k));
+  currentUser = data.user || data;
+  const token = data.access_token;
+  // Store session
+  try{localStorage.setItem('sb_session', JSON.stringify({token, user: currentUser}));}catch(e){}
+  // Update sbFetch to use auth token
+  window._sbAuthToken = token;
+  // Clear all cached data so we load fresh from Supabase for this user
+  ['diesel_vehicles_v1','diesel_maintenance_v2','diesel_svc_types_v2',
+   'diesel_tracker_v4','nissan_settings','fuel_calc_v5',
+   'diesel_fee_lbp_per20','diesel_fuel_price_20'].forEach(k=>localStorage.removeItem(k));
+  // Hide auth screen
   document.getElementById('auth-screen').classList.add('hidden');
-  const uname=currentUser.user_metadata&&currentUser.user_metadata.name||currentUser.email;
-  const hdr=document.querySelector('.header-titles p');
-  if(hdr)hdr.textContent='Voucher management · Vehicles · Service';
+  // Update header with user name
+  const name = currentUser.user_metadata?.name || currentUser.email;
+  const hdr = document.querySelector('.header-titles p');
+  if(hdr) hdr.textContent = '👤 '+name+' · Voucher management';
+  // Add logout button
   addLogoutBtn();
-  setConnStatus('loading','Loading...');
-  entries=[];nextId=1;renderAll();
+  // Load data
+  setConnStatus('loading','Loading your data...');
+  entries=[]; nextId=1;
+  renderAll();
   try{
     await loadFromSupabase();
     renderAll();
@@ -2844,119 +2900,79 @@ async function onAuthSuccess(data){
     await loadSettingsFromSupabase();
     prefillAddEntry&&prefillAddEntry();
     setTimeout(()=>renderReminders&&renderReminders(),600);
-  }catch(e){setConnStatus('offline','Load failed');}
+  }catch(e){setConnStatus('offline','Load failed: '+e.message);}
 }
 
 function addLogoutBtn(){
-  const actions=document.querySelector('.header-actions');
-  if(!actions||document.getElementById('logout-btn'))return;
-  const btn=document.createElement('button');
-  btn.id='logout-btn';btn.className='hbtn';btn.innerHTML='↩ <span>Logout</span>';
-  btn.onclick=doLogout;actions.appendChild(btn);
+  const actions = document.querySelector('.header-actions');
+  if(!actions||document.getElementById('logout-btn')) return;
+  const btn = document.createElement('button');
+  btn.id='logout-btn'; btn.className='hbtn';
+  btn.innerHTML='↩ <span>Logout</span>';
+  btn.onclick = doLogout;
+  actions.appendChild(btn);
 }
 
 async function doLogout(){
-  if(!confirm('Sign out?'))return;
-  try{await fetch(sbUrl+'/auth/v1/logout',{method:'POST',headers:{'apikey':sbKey,'Authorization':'Bearer '+window._sbAuthToken}});}catch(e){}
+  if(!confirm('Sign out?')) return;
+  try{
+    await fetch(sbUrl+'/auth/v1/logout',{method:'POST',headers:{'apikey':sbKey,'Authorization':'Bearer '+window._sbAuthToken}});
+  }catch(e){}
   localStorage.removeItem('sb_session');
-  window._sbAuthToken=null;currentUser=null;entries=[];renderAll();
+  window._sbAuthToken=null;
+  currentUser=null;
+  entries=[];
+  renderAll();
   document.getElementById('auth-screen').classList.remove('hidden');
-  const lb=document.getElementById('logout-btn');if(lb)lb.remove();
+  const logoutBtn=document.getElementById('logout-btn');
+  if(logoutBtn) logoutBtn.remove();
 }
 
 async function checkSession(){
+  // Try to restore session from localStorage
   try{
-    const saved=JSON.parse(localStorage.getItem('sb_session')||'null');
+    const saved = JSON.parse(localStorage.getItem('sb_session')||'null');
     if(saved&&saved.token){
-      const controller=new AbortController();
-      const timeout=setTimeout(()=>controller.abort(),5000);
-      try{
-        const r=await fetch(sbUrl+'/auth/v1/user',{headers:{'apikey':sbKey,'Authorization':'Bearer '+saved.token},signal:controller.signal});
-        clearTimeout(timeout);
-        if(r.ok){const user=await r.json();if(user.id){await onAuthSuccess({...saved,user,access_token:saved.token});return;}}
-      }catch(e){clearTimeout(timeout);}
+      // Verify token is still valid
+      const r = await fetch(sbUrl+'/auth/v1/user',{
+        headers:{'apikey':sbKey,'Authorization':'Bearer '+saved.token}
+      });
+      if(r.ok){
+        const user = await r.json();
+        if(user.id){
+          await onAuthSuccess({...saved, user, access_token: saved.token});
+          return;
+        }
+      }
     }
   }catch(e){}
+  // No valid session — show login
   document.getElementById('auth-screen').classList.remove('hidden');
 }
 
-document.addEventListener('keydown',function(e){
+// Allow Enter key on auth forms
+document.addEventListener('keydown', function(e){
   if(e.key==='Enter'){
-    const loginVisible=document.getElementById('auth-login').style.display!=='none';
-    if(document.getElementById('auth-screen')&&!document.getElementById('auth-screen').classList.contains('hidden')){
-      if(loginVisible)doLogin();else doSignup();
-    }
+    const loginVisible = document.getElementById('auth-login').style.display!=='none';
+    if(loginVisible) doLogin();
+    else doSignup();
   }
 });
 
-window.addEventListener('load',function(){
-  if(sbUrl&&sbKey){checkSession();}
-  else{document.getElementById('auth-screen').classList.add('hidden');}
+// sbFetch auth handled inline
+
+// Override init — wait for auth before loading data
+window.addEventListener('load', ()=>{
+  // Hide main app initially
+  document.getElementById('auth-screen').classList.remove('hidden');
+  // Check for existing session
+  if(sbUrl&&sbKey){
+    checkSession();
+  } else {
+    // No Supabase configured
+    document.getElementById('auth-screen').classList.add('hidden');
+  }
 });
-
-// ══════════════════════════════════════════
-// EXPORT MODULE
-// ══════════════════════════════════════════
-function exportExcel(){
-  if(!window.XLSX){alert('Excel library not loaded');return;}
-  const name=(currentUser&&(currentUser.user_metadata&&currentUser.user_metadata.name||currentUser.email))||'User';
-  const rows=[['Date','Type','Person/Vehicle','10L','20L','30L','Total L','Actual L','Odometer','Notes']];
-  const sorted=[...entries].sort(function(a,b){return new Date(b.dateStr)-new Date(a.dateStr);});
-  sorted.forEach(function(e){
-    rows.push([e.dateStr,typeLabel(e.type),e.person||'',e.v10||0,e.v20||0,e.v30||0,toLt(e.v10,e.v20,e.v30),e.actualLt||'',e.odometer||'',e.notes||'']);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:12},{wch:16},{wch:18},{wch:5},{wch:5},{wch:5},{wch:9},{wch:9},{wch:12},{wch:20}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Diesel Log');
-  const stock=calcStock();
-  const sumRows=[['Diesel Tracker Summary'],[''],['User',name],['Export date',new Date().toLocaleDateString()],['Total entries',entries.length],[''],['10L stock',stock.v10],['20L stock',stock.v20],['30L stock',stock.v30]];
-  const ws2=XLSX.utils.aoa_to_sheet(sumRows);
-  XLSX.utils.book_append_sheet(wb,ws2,'Summary');
-  XLSX.writeFile(wb,'diesel-tracker-'+new Date().toISOString().split('T')[0]+'.xlsx');
-  toast('Excel exported');
-}
-
-function exportPDF(){
-  const name=(currentUser&&(currentUser.user_metadata&&currentUser.user_metadata.name||currentUser.email))||'User';
-  const sorted=[...entries].sort(function(a,b){return new Date(b.dateStr)-new Date(a.dateStr);});
-  const stock=calcStock();
-  let rows='';
-  sorted.slice(0,300).forEach(function(e){
-    const lt=toLt(e.v10,e.v20,e.v30);
-    rows+='<tr><td>'+e.dateStr+'</td><td>'+typeLabel(e.type)+'</td><td>'+(e.person||'')+'</td>'+
-      '<td>'+( e.v10||0)+'</td><td>'+(e.v20||0)+'</td><td>'+(e.v30||0)+'</td>'+
-      '<td>'+lt+'L</td><td>'+(e.actualLt||'')+'</td><td>'+(e.odometer?e.odometer.toLocaleString()+' km':'')+'</td>'+
-      '<td>'+(e.notes||'')+'</td></tr>';
-  });
-  const dateStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-  const doc='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Diesel Report</title>'+
-    '<style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h1{font-size:18px;color:#1a2744}'+
-    '.sub{color:#6b7280;font-size:12px;margin-bottom:16px}.cards{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}'+
-    '.card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px}'+
-    '.cl{font-size:10px;color:#6b7280;text-transform:uppercase}.cv{font-size:20px;font-weight:700;color:#1a2744}'+
-    'table{width:100%;border-collapse:collapse;font-size:10px}th{background:#1a2744;color:#fff;padding:6px 8px;text-align:left}'+
-    'td{padding:5px 8px;border-bottom:1px solid #f1f5f9}tr:nth-child(even){background:#f8fafc}'+
-    '.np{margin-top:12px;font-size:10px;color:#9ca3af;text-align:center}@media print{.no-print{display:none}}</style></head><body>'+
-    '<div style="display:flex;justify-content:space-between;align-items:center">'+
-    '<div><h1>Diesel Tracker Report</h1><div class="sub">'+name+' &middot; '+dateStr+'</div></div>'+
-    '<button class="no-print" onclick="window.print()" style="padding:8px 14px;background:#1a2744;color:#fff;border:none;border-radius:6px;cursor:pointer">Print / Save PDF</button>'+
-    '</div>'+
-    '<div class="cards">'+
-    '<div class="card"><div class="cl">Entries</div><div class="cv">'+entries.length+'</div></div>'+
-    '<div class="card"><div class="cl">10L Stock</div><div class="cv">'+stock.v10+'</div></div>'+
-    '<div class="card"><div class="cl">20L Stock</div><div class="cv">'+stock.v20+'</div></div>'+
-    '<div class="card"><div class="cl">30L Stock</div><div class="cv">'+stock.v30+'</div></div>'+
-    '</div>'+
-    '<table><thead><tr><th>Date</th><th>Type</th><th>Person</th><th>10L</th><th>20L</th><th>30L</th><th>Total</th><th>Actual</th><th>Odometer</th><th>Notes</th></tr></thead>'+
-    '<tbody>'+rows+'</tbody></table>'+
-    (sorted.length>300?'<p class="np">Showing 300 of '+sorted.length+' entries</p>':'')+
-    '<p class="np">Diesel Tracker &middot; '+new Date().getFullYear()+'</p>'+
-    '</body></html>';
-  const win=window.open('','_blank');
-  if(win){win.document.write(doc);win.document.close();}
-  toast('PDF preview opened');
-}
 
 </script>
 </body>

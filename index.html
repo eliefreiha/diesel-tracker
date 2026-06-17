@@ -375,7 +375,9 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="fg" style="margin-bottom:0"><label>Person / Vehicle</label>
-        <input type="text" id="inp-person" list="persons-datalist" placeholder="Type or select..." oninput="onPersonChange()" autocomplete="off">
+        <select id="inp-person" onchange="onPersonChange()" style="font-size:13px;padding:8px 11px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface);color:var(--text);width:100%;outline:none">
+          <option value="">Select vehicle...</option>
+        </select>
         <datalist id="persons-datalist"></datalist>
       </div>
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="inp-notes" placeholder="Optional"></div>
@@ -1399,10 +1401,13 @@ function onTypeChange(){
   const personEl=document.getElementById('inp-person');
   const sec=document.getElementById('odo-section');
 
-  updatePersonDropdown&&updatePersonDropdown();
-
+  // Rebuild person dropdown based on type
+  const vehs=getVehicles();
   if(t==='تعبئة'){
-    const vehs=getVehicles();
+    // Car fill: select with vehicles only
+    personEl.innerHTML='<option value="">Select vehicle...</option>'+
+      vehs.map(v=>'<option value="'+vehLabel(v)+'">🚗 '+vehLabel(v)+'</option>').join('');
+    personEl.type='select-one';
     if(vehs.length) personEl.value=vehLabel(vehs[0]);
     document.getElementById('inp-v10').value=0;
     document.getElementById('inp-v20').value=0;
@@ -2492,13 +2497,18 @@ async function openAddModal(){
   const ti=document.getElementById('inp-type');
   if(ti) ti.value='تعبئة';
 
-  // Person datalist — only vehicles for car fill
-  const dl=document.getElementById('persons-datalist');
-  if(dl) dl.innerHTML=vehs.map(v=>'<option value="'+vehLabel(v)+'">').join('');
-
-  // Auto-select first vehicle
+  // Build person SELECT with all vehicles
   const pi=document.getElementById('inp-person');
-  if(pi) pi.value=vehs.length?vehLabel(vehs[0]):'';
+  if(pi){
+    const type=(document.getElementById('inp-type')||{}).value||'تعبئة';
+    if(type==='تعبئة'){
+      // Car fill: show vehicles as select options
+      pi.innerHTML='<option value="">Select vehicle...</option>'+
+        vehs.map(v=>'<option value="'+vehLabel(v)+'">🚗 '+vehLabel(v)+'</option>').join('');
+      pi.type='select-one';
+    }
+    if(vehs.length) pi.value=vehLabel(vehs[0]);
+  }
 
   // Show odo section
   const sec=document.getElementById('odo-section');
@@ -2518,6 +2528,7 @@ async function openAddModal(){
   // Open modal
   document.getElementById('add-modal').classList.add('open');
 }
+
 function openAddPanel(){openAddModal();}
 function closeAddPanel(){closeModal('add-modal');}
 function closeAddPanel(){

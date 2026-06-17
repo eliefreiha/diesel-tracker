@@ -524,7 +524,7 @@ tr:hover td{background:var(--surface2)}
         <table>
           <thead><tr>
             <th>Date</th><th>Vehicle</th><th class="r">Odometer</th>
-            <th>Services</th><th class="r">Cost (LBP)</th>
+            <th>Services</th><th class="r">Cost (USD)</th>
             <th class="col-hm">Notes</th><th></th>
           </tr></thead>
           <tbody id="maintenance-body"></tbody>
@@ -601,7 +601,7 @@ tr:hover td{background:var(--surface2)}
     <div id="maint-costs"></div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 13px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-size:13px">
       <span style="color:var(--text2)">Total cost</span>
-      <strong id="maint-total-cost">0 LBP</strong>
+      <strong id="maint-total-cost">$0.00</strong>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn btn-p" onclick="saveMaintenanceEntry()">Save visit</button>
@@ -2005,7 +2005,7 @@ function renderMaintenanceLog(){
   el.innerHTML=[...maintenanceEntries].sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr)).map(function(e){
     const tc=Object.values(e.costs||{}).reduce((a,b)=>a+(parseFloat(b)||0),0);
     const sn=(e.services||[]).map(id=>nm[id]||id);
-    return'<tr><td style="white-space:nowrap;font-size:12px">'+fmtDate(e.dateStr)+'</td><td style="font-size:12px">'+(vm[e.vehicleId||'nissan']||'—')+'</td><td class="r" style="font-weight:600">'+(e.odometer?e.odometer.toLocaleString()+' km':'—')+'</td><td><div style="display:flex;flex-wrap:wrap;gap:4px">'+sn.map(n=>'<span style="background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:20px;font-size:11px">'+n+'</span>').join('')+'</div></td><td class="r">'+(tc?Math.round(tc).toLocaleString():'')+'</td><td class="col-hm" style="font-size:12px;color:var(--text2)">'+(e.notes||'')+'</td><td><button class="btn-icon" onclick="openMaintenanceEdit('+e.id+')">&#9999;</button></td></tr>';
+    return'<tr><td style="white-space:nowrap;font-size:12px">'+fmtDate(e.dateStr)+'</td><td style="font-size:12px">'+(vm[e.vehicleId||'nissan']||'—')+'</td><td class="r" style="font-weight:600">'+(e.odometer?e.odometer.toLocaleString()+' km':'—')+'</td><td><div style="display:flex;flex-wrap:wrap;gap:4px">'+sn.map(n=>'<span style="background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:20px;font-size:11px">'+n+'</span>').join('')+'</div></td><td class="r">'+(tc?'$'+tc.toFixed(2):'')+'</td><td class="col-hm" style="font-size:12px;color:var(--text2)">'+(e.notes||'')+'</td><td><button class="btn-icon" onclick="openMaintenanceEdit('+e.id+')">&#9999;</button></td></tr>';
   }).join('');
 }
 function renderServiceTypesList(){
@@ -2058,10 +2058,10 @@ function renderCosts(sel,costs){
   const nm={};getServiceTypes2().forEach(t=>nm[t.id]=t.name);
   const el=document.getElementById('maint-costs');if(!el)return;
   if(!sel.length){el.innerHTML='';updateTotalCost();return;}
-  el.innerHTML='<div class="sec-title" style="margin-bottom:8px">Cost per service (LBP)</div>'+sel.map(function(id){return'<div class="cost-row"><span>'+(nm[id]||id)+'</span><input type="number" id="cost-'+id+'" value="'+(costs[id]||'')+'" placeholder="0" min="0" step="1000" class="cost-inp" oninput="updateTotalCost()"><span style="font-size:12px;color:var(--text3)">LBP</span></div>';}).join('');
+  el.innerHTML='<div class="sec-title" style="margin-bottom:8px">Cost per service (USD)</div>'+sel.map(function(id){return'<div class="cost-row"><span>'+(nm[id]||id)+'</span><input type="number" id="cost-'+id+'" value="'+(costs[id]||'')+'" placeholder="0" min="0" step="1" class="cost-inp" oninput="updateTotalCost()"><span style="font-size:12px;color:var(--text3)">USD</span></div>';}).join('');
   updateTotalCost();
 }
-function updateTotalCost(){const t=[...document.querySelectorAll('[id^="cost-"]')].reduce((s,i)=>s+(parseFloat(i.value)||0),0);const el=document.getElementById('maint-total-cost');if(el)el.textContent=Math.round(t).toLocaleString()+' LBP';}
+function updateTotalCost(){const t=[...document.querySelectorAll('[id^="cost-"]')].reduce((s,i)=>s+(parseFloat(i.value)||0),0);const el=document.getElementById('maint-total-cost');if(el)el.textContent='$'+t.toFixed(2);}
 async function saveMaintenanceEntry(){
   const dateStr=document.getElementById('maint-date').value;
   const vehicleId=(document.getElementById('maint-vehicle')||{}).value||'nissan';

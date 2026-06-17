@@ -2904,11 +2904,15 @@ async function fcFetchPrice(){
     const data=await res.json();
     const txt=data.contents||'';
     // Look for price pattern in HTML - IPT shows price like 2,350,000 or 2350000
-    const match=txt.match(/95[^<]*?([\d,]{7,10})\s*LBP/i)||
-                 txt.match(/Octane[^<]*?([\d,]{7,10})/i)||
-                 txt.match(/([\d,]{7,10})\s*LBP[^<]*?95/i);
+    // Look for 7-digit price numbers near "95" or "LBP"
+    let price=0;
+    const nums=txt.match(/[0-9]{1,3}(?:,[0-9]{3})+/g)||[];
+    for(const n of nums){
+      const v=parseInt(n.replace(/,/g,''));
+      if(v>500000&&v<10000000){price=v;break;}
+    }
+    const match=price>0;
     if(match){
-      const price=parseInt(match[1].replace(/,/g,''));
       if(price>500000&&price<10000000){
         const inp=document.getElementById('fc-price20');
         if(inp) inp.value=price;

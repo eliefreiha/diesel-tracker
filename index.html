@@ -4016,6 +4016,493 @@ setTimeout(()=>{
   if(badge&&alertCount>0){badge.style.display='inline';badge.textContent=alertCount;}
 },1500);
 
+// ══════════════════════════════════════════
+// VEHICLE & SERVICE MODULE v2
+// ══════════════════════════════════════════
+const LS_VEHICLES = 'diesel_vehicles_v1';
+const LS_MAINTENANCE2 = 'diesel_maintenance_v2';
+const LS_SVC_TYPES2 = 'diesel_svc_types_v2';
+
+// ── Default vehicles ──
+function getVehicles(){
+  try{const s=JSON.parse(localStorage.getItem(LS_VEHICLES)||'null');if(s)return s;}catch(e){}
+  return [{id:'nissan',name:'Nissan',plate:'',year:'',type:'suv'}];
+}
+function saveVehicles(v){
+  try{localStorage.setItem(LS_VEHICLES,JSON.stringify(v));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('vehicles',v);
+}
+function addVehicle(){
+  const name=document.getElementById('new-veh-name').value.trim();
+  if(!name){alert('Please enter a vehicle name');return;}
+  const v=getVehicles();
+  const id='veh_'+Date.now();
+  v.push({id,name,plate:document.getElementById('new-veh-plate').value.trim(),year:document.getElementById('new-veh-year').value,type:document.getElementById('new-veh-type').value});
+  saveVehicles(v);
+  document.getElementById('new-veh-name').value='';
+  document.getElementById('new-veh-plate').value='';
+  document.getElementById('new-veh-year').value='';
+  renderVehiclesList();
+  refreshVehicleDropdowns();
+  toast('Vehicle added ✓');
+}
+function removeVehicle(id){
+  if(!confirm('Remove this vehicle?'))return;
+  saveVehicles(getVehicles().filter(v=>v.id!==id));
+  renderVehiclesList();refreshVehicleDropdowns();toast('Removed');
+}
+function renderVehiclesList(){
+  const el=document.getElementById('vehicles-list');if(!el)return;
+  const v=getVehicles();
+  if(!v.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">No vehicles yet.</p>';return;}
+  const icons={car:'🚗',suv:'🚙',truck:'🚛',motorcycle:'🏍',other:'🚘'};
+  el.innerHTML=v.map(vh=>`<div class="veh-card">
+    <span style="font-size:20px">${icons[vh.type]||'🚗'}</span>
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:600">${vh.name}</div>
+      <div style="font-size:11px;color:var(--text3)">${[vh.year,vh.plate].filter(Boolean).join(' · ')}</div>
+    </div>
+    <button class="btn-icon del" onclick="removeVehicle('${vh.id}')">✕</button>
+  </div>`).join('');
+}
+function refreshVehicleDropdowns(){
+  const v=getVehicles();
+  const opts=v.map(vh=>`<option value="${vh.id}">${vh.name}</option>`).join('');
+  ['maint-vehicle','svc-vehicle-filter'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    if(id==='svc-vehicle-filter') el.innerHTML='<option value="">All vehicles</option>'+opts;
+    else el.innerHTML='<option value="">Select vehicle...</option>'+opts;
+    if([...el.options].find(o=>o.value===cur)) el.value=cur;
+  });
+}
+
+// ── Service types ──
+const DEFAULT_SVC_TYPES2=[
+  {id:'oil',    name:'Oil change',        reminder:{type:'both',km:5000,timeVal:3,timeUnit:'months'}},
+  {id:'oilfilter',name:'Oil filter',      reminder:{type:'km',km:5000}},
+  {id:'airfilter',name:'Air filter',      reminder:{type:'km',km:20000}},
+  {id:'tires',  name:'Tire rotation',     reminder:{type:'both',km:10000,timeVal:6,timeUnit:'months'}},
+  {id:'brakes', name:'Brake inspection',  reminder:{type:'km',km:20000}},
+  {id:'spark',  name:'Spark plugs',       reminder:{type:'km',km:30000}},
+  {id:'belt',   name:'Timing belt',       reminder:{type:'km',km:60000}},
+  {id:'coolant',name:'Coolant flush',     reminder:{type:'both',km:40000,timeVal:2,timeUnit:'years'}},
+  {id:'transmission',name:'Transmission oil',reminder:{type:'km',km:40000}},
+  {id:'battery',name:'Battery check',     reminder:{type:'both',km:30000,timeVal:2,timeUnit:'years'}},
+  {id:'wipers', name:'Wiper blades',      reminder:{type:'both',km:20000,timeVal:1,timeUnit:'years'}},
+  {id:'ac',     name:'AC service',        reminder:{type:'both',km:20000,timeVal:1,timeUnit:'years'}},
+];
+function getServiceTypes2(){
+  try{const s=JSON.parse(localStorage.getItem(LS_SVC_TYPES2)||'null');if(s)return s;}catch(e){}
+  return DEFAULT_SVC_TYPES2.map(t=>({...t}));
+}
+function saveServiceTypes2(t){
+  try{localStorage.setItem(LS_SVC_TYPES2,JSON.stringify(t));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('svc_types2',t);
+}
+function addServiceType(){
+  const name=document.getElementById('new-svc-name').value.trim();
+  if(!name){alert('Please enter a name');return;}
+  const rType=document.getElementById('new-svc-reminder-type').value;
+  const reminder={type:rType};
+  if(rType==='km'||rType==='both') reminder.km=parseInt(document.getElementById('new-svc-km').value)||0;
+  if(rType==='time'||rType==='both'){reminder.timeVal=parseInt(document.getElementById('new-svc-time-val').value)||0;reminder.timeUnit=document.getElementById('new-svc-time-unit').value;}
+  const types=getServiceTypes2();
+  types.push({id:'svc_'+Date.now(),name,reminder});
+  saveServiceTypes2(types);
+  document.getElementById('new-svc-name').value='';
+  renderServiceTypesList();toast('Service type added ✓');
+}
+function removeServiceType(id){
+  if(!confirm('Remove?'))return;
+  saveServiceTypes2(getServiceTypes2().filter(t=>t.id!==id));
+  renderServiceTypesList();
+}
+function updateSvcReminderVisibility(val){
+  const km=document.getElementById('new-svc-km-wrap');
+  const ti=document.getElementById('new-svc-time-wrap');
+  if(km) km.style.display=(val==='km'||val==='both')?'':'none';
+  if(ti) ti.style.display=(val==='time'||val==='both')?'':'none';
+}
+
+// ── Maintenance entries ──
+let maintenanceEntries=[];
+function loadMaintenanceLocal(){
+  try{const s=localStorage.getItem(LS_MAINTENANCE2);if(s)return JSON.parse(s);}catch(e){}
+  // migrate from old key
+  try{const s=localStorage.getItem('diesel_maintenance_v1');if(s)return JSON.parse(s);}catch(e){}
+  return[];
+}
+function saveMaintenanceLocal(){try{localStorage.setItem(LS_MAINTENANCE2,JSON.stringify(maintenanceEntries));}catch(e){}}
+async function loadMaintenanceFromSupabase(){
+  if(!sbUrl||!sbKey)return;
+  try{
+    const data=await sbFetch('maintenance_entries?order=date_str.desc,id.desc&limit=1000');
+    if(data){
+      maintenanceEntries=data.map(r=>({id:r.id,dateStr:r.date_str,vehicleId:r.vehicle_id||'nissan',odometer:r.odometer,services:r.services||[],costs:r.costs||{},notes:r.notes||''}));
+      saveMaintenanceLocal();
+    }
+  }catch(e){console.warn('maint load',e);}
+}
+async function sbInsertMaintenance(e){
+  if(!sbUrl||!sbKey)return e;
+  try{
+    const body={date_str:e.dateStr,vehicle_id:e.vehicleId||null,odometer:e.odometer,services:e.services,costs:e.costs,notes:e.notes||null};
+    const data=await sbFetch('maintenance_entries',{method:'POST',body:JSON.stringify(body)});
+    if(data&&data[0])return{...e,id:data[0].id};
+  }catch(err){console.warn('maint insert',err);}
+  return e;
+}
+async function sbUpdateMaintenance(e){
+  if(!sbUrl||!sbKey)return;
+  try{await sbFetch(`maintenance_entries?id=eq.${e.id}`,{method:'PATCH',body:JSON.stringify({date_str:e.dateStr,vehicle_id:e.vehicleId||null,odometer:e.odometer,services:e.services,costs:e.costs,notes:e.notes||null})});}catch(err){}
+}
+async function sbDeleteMaintenance(id){
+  if(!sbUrl||!sbKey)return;
+  try{await sbFetch(`maintenance_entries?id=eq.${id}`,{method:'DELETE'});}catch(err){}
+}
+
+// ── Last service per type per vehicle ──
+function getLastService(svcId, vehicleId){
+  const filtered=vehicleId
+    ? maintenanceEntries.filter(e=>e.vehicleId===vehicleId&&e.services&&e.services.includes(svcId))
+    : maintenanceEntries.filter(e=>e.services&&e.services.includes(svcId));
+  filtered.sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+  return filtered[0]||null;
+}
+function getCurrentOdo(vehicleId){
+  // For Nissan, use fuel fill odometer
+  const veh=getVehicles().find(v=>v.id===vehicleId);
+  if(veh&&veh.name.toLowerCase().includes('نيسان')||veh&&veh.id==='nissan'){
+    const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer).sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+    if(fills.length) return fills[0].odometer;
+  }
+  // Otherwise use last maintenance odometer
+  const maintWithOdo=maintenanceEntries.filter(e=>(!vehicleId||e.vehicleId===vehicleId)&&e.odometer).sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+  return maintWithOdo.length?maintWithOdo[0].odometer:0;
+}
+
+// ── Reminder calculation ──
+function calcNextDue(svcType, last){
+  if(!last||!svcType.reminder||svcType.reminder.type==='none') return null;
+  const r=svcType.reminder;
+  const result={};
+  if((r.type==='km'||r.type==='both')&&r.km&&last.odometer){
+    result.nextOdo=last.odometer+r.km;
+    result.km=r.km;
+  }
+  if((r.type==='time'||r.type==='both')&&r.timeVal&&r.timeUnit){
+    const d=new Date(last.dateStr);
+    if(r.timeUnit==='days') d.setDate(d.getDate()+r.timeVal);
+    else if(r.timeUnit==='months') d.setMonth(d.getMonth()+r.timeVal);
+    else if(r.timeUnit==='years') d.setFullYear(d.getFullYear()+r.timeVal);
+    result.nextDate=d;
+    result.nextDateStr=d.toISOString().split('T')[0];
+  }
+  return result;
+}
+function getStatus(svcType, last, currentOdo){
+  if(!svcType.reminder||svcType.reminder.type==='none') return null;
+  const next=calcNextDue(svcType,last);
+  if(!next) return {code:'never',label:'No history',cls:'status-ok'};
+  const today=new Date();
+  let overdueKm=false, overdueDt=false, soonKm=false, soonDt=false;
+  if(next.nextOdo){
+    const rem=next.nextOdo-currentOdo;
+    if(rem<=0) overdueKm=true;
+    else if(rem<=500) soonKm=true;
+  }
+  if(next.nextDate){
+    const daysLeft=Math.round((next.nextDate-today)/(1000*60*60*24));
+    if(daysLeft<0) overdueDt=true;
+    else if(daysLeft<=14) soonDt=true;
+  }
+  if(overdueKm||overdueDt) return{code:'overdue',label:'⚠ Overdue',cls:'status-overdue',next};
+  if(soonKm||soonDt) return{code:'soon',label:'⏰ Due soon',cls:'status-soon',next};
+  return{code:'ok',label:'✅ OK',cls:'status-ok',next};
+}
+
+// ── Render reminders table ──
+function renderReminders(){
+  const types=getServiceTypes2();
+  const vehicles=getVehicles();
+  const filterVeh=document.getElementById('svc-vehicle-filter')?.value||'';
+  const tbody=document.getElementById('reminders-body');
+  if(!tbody) return;
+  
+  const rows=[];
+  vehicles.filter(v=>!filterVeh||v.id===filterVeh).forEach(veh=>{
+    const currentOdo=getCurrentOdo(veh.id);
+    types.forEach(t=>{
+      const last=getLastService(t.id,veh.id);
+      const status=getStatus(t,last,currentOdo);
+      if(!status) return; // no reminder set
+      const next=status.next||{};
+      rows.push({veh,t,last,status,next,currentOdo});
+    });
+  });
+
+  // Sort: overdue first, then soon, then ok
+  const order={overdue:0,soon:1,ok:2,never:3};
+  rows.sort((a,b)=>(order[a.status.code]||3)-(order[b.status.code]||3));
+
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="7"><div class="empty-state">No reminders set. Add service types with intervals in the ⚙️ Service Types tab.</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=rows.map(({veh,t,last,status,next})=>{
+    const lastInfo=last?`${fmtDate(last.dateStr)}${last.odometer?' · '+last.odometer.toLocaleString()+' km':''}`:'Never';
+    const lastOdoDisp=last&&last.odometer?last.odometer.toLocaleString()+' km':'—';
+    let nextInfo='';
+    if(next.nextOdo) nextInfo+=`${next.nextOdo.toLocaleString()} km`;
+    if(next.nextDate) nextInfo+=(nextInfo?' · ':'')+fmtDate(next.nextDateStr);
+    return`<tr>
+      <td style="font-weight:600">${t.name}</td>
+      <td style="font-size:12px;color:var(--text2)">${veh.name}</td>
+      <td style="font-size:12px">${lastInfo}</td>
+      <td style="font-size:12px;text-align:right">${lastOdoDisp}</td>
+      <td style="font-size:12px;color:var(--navy)">${nextInfo||'—'}</td>
+      <td><span class="${status.cls}">${status.label}</span></td>
+      <td><button class="btn btn-p btn-sm" onclick="completeReminder('${t.id}','${veh.id}')">✓ Done</button></td>
+    </tr>`;
+  }).join('');
+
+  // Update nav badge
+  const overdueCount=rows.filter(r=>r.status.code==='overdue').length;
+  const soonCount=rows.filter(r=>r.status.code==='soon').length;
+  const badge=document.getElementById('svc-badge');
+  const banner=document.getElementById('svc-alert-banner');
+  if(badge){
+    if(overdueCount+soonCount>0){badge.style.display='inline';badge.textContent=overdueCount+soonCount;}
+    else badge.style.display='none';
+  }
+  if(banner){
+    if(overdueCount>0){
+      banner.style.display='block';
+      document.getElementById('svc-alert-content').innerHTML=
+        `${overdueCount} service${overdueCount>1?'s':''} overdue · ${soonCount} due soon`;
+    } else banner.style.display='none';
+  }
+}
+
+// ── Complete reminder → open pre-filled form ──
+function completeReminder(svcId, vehicleId){
+  // Switch to log tab and open modal pre-filled
+  showSvcTab('log', document.getElementById('stab-log'));
+  openMaintenancePanel(svcId, vehicleId);
+}
+
+// ── Render service log ──
+function renderMaintenanceLog(){
+  const types=getServiceTypes2();
+  const vehicles=getVehicles();
+  const nameMap={};types.forEach(t=>nameMap[t.id]=t.name);
+  const vehMap={};vehicles.forEach(v=>vehMap[v.id]=v.name);
+  const el=document.getElementById('maintenance-body');if(!el)return;
+  if(!maintenanceEntries.length){
+    el.innerHTML='<tr><td colspan="7"><div class="empty-state">No service visits yet. Click "+ Add visit" to start.</div></td></tr>';
+    return;
+  }
+  el.innerHTML=[...maintenanceEntries].sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr)).map(e=>{
+    const totalCost=Object.values(e.costs||{}).reduce((a,b)=>a+(parseFloat(b)||0),0);
+    const svcNames=(e.services||[]).map(id=>nameMap[id]||id);
+    return`<tr>
+      <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
+      <td style="font-size:12px">${vehMap[e.vehicleId||'nissan']||e.vehicleId||'—'}</td>
+      <td class="r" style="font-weight:600">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:4px">${svcNames.map(n=>`<span style="background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:20px;font-size:11px">${n}</span>`).join('')}</div></td>
+      <td class="r" style="font-weight:600">${totalCost?Math.round(totalCost).toLocaleString():''}</td>
+      <td class="col-hm" style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
+      <td><button class="btn-icon" onclick="openMaintenanceEdit(${e.id})">✏️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Render service types list ──
+function renderServiceTypesList(){
+  const types=getServiceTypes2();
+  const el=document.getElementById('service-types-list');if(!el)return;
+  updateSvcReminderVisibility(document.getElementById('new-svc-reminder-type')?.value||'none');
+  if(!types.length){el.innerHTML='<p style="font-size:13px;color:var(--text3);margin-bottom:10px">No service types.</p>';return;}
+  el.innerHTML=types.map(t=>{
+    const r=t.reminder;
+    let txt='No reminder';
+    if(r&&r.type!=='none'){
+      const p=[];
+      if(r.km&&(r.type==='km'||r.type==='both')) p.push(`every ${r.km.toLocaleString()} km`);
+      if(r.timeVal&&(r.type==='time'||r.type==='both')) p.push(`every ${r.timeVal} ${r.timeUnit}`);
+      txt=p.join(' + ');
+    }
+    return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px;font-weight:500;flex:1">${t.name}</span>
+      <span style="font-size:11px;color:var(--text3)">${txt}</span>
+      <button class="btn-icon del" onclick="removeServiceType('${t.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Maintenance panel ──
+let _editingMaintId=null;
+function openMaintenancePanel(preSvcId, preVehicleId){
+  _editingMaintId=null;
+  document.getElementById('maint-panel-title').textContent='New service visit';
+  document.getElementById('maint-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('maint-notes').value='';
+  document.getElementById('maint-delete-btn').style.display='none';
+  // pre-select vehicle
+  const vehSel=document.getElementById('maint-vehicle');
+  if(preVehicleId&&vehSel) vehSel.value=preVehicleId;
+  else if(vehSel&&getVehicles().length) vehSel.value=getVehicles()[0].id;
+  // set odo
+  const vehId=vehSel?vehSel.value:'nissan';
+  document.getElementById('maint-odo').value=getCurrentOdo(vehId)||'';
+  buildServiceChecklist(preSvcId?[preSvcId]:[],{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function openMaintenanceEdit(id){
+  const e=maintenanceEntries.find(x=>x.id===id);if(!e)return;
+  _editingMaintId=id;
+  document.getElementById('maint-panel-title').textContent='Edit service visit';
+  document.getElementById('maint-date').value=e.dateStr;
+  const vehSel=document.getElementById('maint-vehicle');
+  if(vehSel) vehSel.value=e.vehicleId||getVehicles()[0]?.id||'';
+  document.getElementById('maint-odo').value=e.odometer||'';
+  document.getElementById('maint-notes').value=e.notes||'';
+  document.getElementById('maint-delete-btn').style.display='inline-flex';
+  buildServiceChecklist(e.services||[],e.costs||{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function buildServiceChecklist(selected, costs){
+  const types=getServiceTypes2();
+  const el=document.getElementById('maint-services-checklist');if(!el)return;
+  el.innerHTML=types.map(t=>`
+    <label class="svc-chip ${selected.includes(t.id)?'checked':''}">
+      <input type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''} onchange="onSvcChipChange(this)">
+      ${t.name}
+    </label>`).join('');
+  renderCostInputs(selected, costs);
+}
+function onSvcChipChange(cb){
+  const lbl=cb.closest('label');
+  lbl.classList.toggle('checked',cb.checked);
+  const checked=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  const costs={};
+  document.querySelectorAll('[id^="cost-"]').forEach(i=>{if(i.value) costs[i.id.replace('cost-','')]=parseFloat(i.value)||0;});
+  renderCostInputs(checked,costs);
+}
+function renderCostInputs(selected, costs){
+  const types=getServiceTypes2();
+  const nameMap={};types.forEach(t=>nameMap[t.id]=t.name);
+  const el=document.getElementById('maint-costs');if(!el)return;
+  if(!selected.length){el.innerHTML='';updateTotalCost();return;}
+  el.innerHTML=`<div class="sec-title" style="margin-bottom:8px">Cost per service (LBP)</div>`+
+    selected.map(id=>`<div class="cost-row">
+      <span>${nameMap[id]||id}</span>
+      <input type="number" id="cost-${id}" value="${costs[id]||''}" placeholder="0" min="0" step="1000" class="cost-inp" oninput="updateTotalCost()">
+      <span style="font-size:12px;color:var(--text3)">LBP</span>
+    </div>`).join('');
+  updateTotalCost();
+}
+function updateTotalCost(){
+  const total=[...document.querySelectorAll('[id^="cost-"]')].reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+  const el=document.getElementById('maint-total-cost');
+  if(el) el.textContent=Math.round(total).toLocaleString()+' LBP';
+}
+async function saveMaintenanceEntry(){
+  const dateStr=document.getElementById('maint-date').value;
+  const vehicleId=document.getElementById('maint-vehicle').value;
+  const odometer=parseInt(document.getElementById('maint-odo').value)||null;
+  const notes=document.getElementById('maint-notes').value.trim();
+  if(!dateStr){alert('Please select a date');return;}
+  const services=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  if(!services.length){alert('Please select at least one service');return;}
+  const costs={};
+  services.forEach(id=>{const el=document.getElementById('cost-'+id);if(el&&el.value) costs[id]=parseFloat(el.value)||0;});
+  if(_editingMaintId){
+    const e=maintenanceEntries.find(x=>x.id===_editingMaintId);
+    if(e){Object.assign(e,{dateStr,vehicleId,odometer,services,costs,notes});}
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) await sbUpdateMaintenance(maintenanceEntries.find(x=>x.id===_editingMaintId));
+    toast('Updated ✓');
+  } else {
+    let entry={id:Date.now(),dateStr,vehicleId,odometer,services,costs,notes};
+    maintenanceEntries.unshift(entry);
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) entry=await sbInsertMaintenance(entry);
+    toast('Service visit saved ✓');
+  }
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+}
+async function deleteMaintenanceEntry(){
+  if(!confirm('Delete this visit?'))return;
+  if(sbUrl&&sbKey) await sbDeleteMaintenance(_editingMaintId);
+  maintenanceEntries=maintenanceEntries.filter(e=>e.id!==_editingMaintId);
+  saveMaintenanceLocal();
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+  toast('Deleted');
+}
+
+// ── Sub-tab switching ──
+function showSvcTab(name, btn){
+  document.querySelectorAll('.svc-tab-content').forEach(el=>el.style.display='none');
+  document.querySelectorAll('.svc-tab').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('svc-'+name);
+  if(el) el.style.display='block';
+  if(btn) btn.classList.add('active');
+  if(name==='reminders') renderReminders();
+  else if(name==='log') renderMaintenanceLog();
+  else if(name==='types') renderServiceTypesList();
+}
+
+// ── Full page render ──
+function renderMaintenancePage(){
+  renderReminders();
+  renderMaintenanceLog();
+  renderServiceTypesList();
+  renderVehiclesList();
+  refreshVehicleDropdowns();
+}
+
+// ── Init ──
+maintenanceEntries=loadMaintenanceLocal();
+
+
+
+// Check alerts on load
+setTimeout(()=>{
+  const types=getServiceTypes2();
+  const vehicles=getVehicles();
+  let alertCount=0;
+  vehicles.forEach(veh=>{
+    const odo=getCurrentOdo(veh.id);
+    types.forEach(t=>{
+      const last=getLastService(t.id,veh.id);
+      const st=getStatus(t,last,odo);
+      if(st&&(st.code==='overdue'||st.code==='soon')) alertCount++;
+    });
+  });
+  const badge=document.getElementById('svc-badge');
+  if(badge&&alertCount>0){badge.style.display='inline';badge.textContent=alertCount;}
+},1500);
+
+
+
+// ── Single showPage (replaces all previous) ──
+function showPage(name, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg=document.getElementById('page-'+name);
+  if(pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(name==='add') prefillAddEntry();
+  if(name==='maintenance'){renderMaintenancePage();setTimeout(()=>renderReminders(),100);}
+  if(name==='settings'){renderVehiclesList();refreshVehicleDropdowns();renderOpTypes();renderDefaultOpToggles();}
+  if(name==='nissan') renderNissan();
+}
+
 </script>
 </body>
 </html>
@@ -4512,6 +4999,493 @@ setTimeout(()=>{
   const badge=document.getElementById('svc-badge');
   if(badge&&alertCount>0){badge.style.display='inline';badge.textContent=alertCount;}
 },1500);
+
+// ══════════════════════════════════════════
+// VEHICLE & SERVICE MODULE v2
+// ══════════════════════════════════════════
+const LS_VEHICLES = 'diesel_vehicles_v1';
+const LS_MAINTENANCE2 = 'diesel_maintenance_v2';
+const LS_SVC_TYPES2 = 'diesel_svc_types_v2';
+
+// ── Default vehicles ──
+function getVehicles(){
+  try{const s=JSON.parse(localStorage.getItem(LS_VEHICLES)||'null');if(s)return s;}catch(e){}
+  return [{id:'nissan',name:'Nissan',plate:'',year:'',type:'suv'}];
+}
+function saveVehicles(v){
+  try{localStorage.setItem(LS_VEHICLES,JSON.stringify(v));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('vehicles',v);
+}
+function addVehicle(){
+  const name=document.getElementById('new-veh-name').value.trim();
+  if(!name){alert('Please enter a vehicle name');return;}
+  const v=getVehicles();
+  const id='veh_'+Date.now();
+  v.push({id,name,plate:document.getElementById('new-veh-plate').value.trim(),year:document.getElementById('new-veh-year').value,type:document.getElementById('new-veh-type').value});
+  saveVehicles(v);
+  document.getElementById('new-veh-name').value='';
+  document.getElementById('new-veh-plate').value='';
+  document.getElementById('new-veh-year').value='';
+  renderVehiclesList();
+  refreshVehicleDropdowns();
+  toast('Vehicle added ✓');
+}
+function removeVehicle(id){
+  if(!confirm('Remove this vehicle?'))return;
+  saveVehicles(getVehicles().filter(v=>v.id!==id));
+  renderVehiclesList();refreshVehicleDropdowns();toast('Removed');
+}
+function renderVehiclesList(){
+  const el=document.getElementById('vehicles-list');if(!el)return;
+  const v=getVehicles();
+  if(!v.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">No vehicles yet.</p>';return;}
+  const icons={car:'🚗',suv:'🚙',truck:'🚛',motorcycle:'🏍',other:'🚘'};
+  el.innerHTML=v.map(vh=>`<div class="veh-card">
+    <span style="font-size:20px">${icons[vh.type]||'🚗'}</span>
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:600">${vh.name}</div>
+      <div style="font-size:11px;color:var(--text3)">${[vh.year,vh.plate].filter(Boolean).join(' · ')}</div>
+    </div>
+    <button class="btn-icon del" onclick="removeVehicle('${vh.id}')">✕</button>
+  </div>`).join('');
+}
+function refreshVehicleDropdowns(){
+  const v=getVehicles();
+  const opts=v.map(vh=>`<option value="${vh.id}">${vh.name}</option>`).join('');
+  ['maint-vehicle','svc-vehicle-filter'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    if(id==='svc-vehicle-filter') el.innerHTML='<option value="">All vehicles</option>'+opts;
+    else el.innerHTML='<option value="">Select vehicle...</option>'+opts;
+    if([...el.options].find(o=>o.value===cur)) el.value=cur;
+  });
+}
+
+// ── Service types ──
+const DEFAULT_SVC_TYPES2=[
+  {id:'oil',    name:'Oil change',        reminder:{type:'both',km:5000,timeVal:3,timeUnit:'months'}},
+  {id:'oilfilter',name:'Oil filter',      reminder:{type:'km',km:5000}},
+  {id:'airfilter',name:'Air filter',      reminder:{type:'km',km:20000}},
+  {id:'tires',  name:'Tire rotation',     reminder:{type:'both',km:10000,timeVal:6,timeUnit:'months'}},
+  {id:'brakes', name:'Brake inspection',  reminder:{type:'km',km:20000}},
+  {id:'spark',  name:'Spark plugs',       reminder:{type:'km',km:30000}},
+  {id:'belt',   name:'Timing belt',       reminder:{type:'km',km:60000}},
+  {id:'coolant',name:'Coolant flush',     reminder:{type:'both',km:40000,timeVal:2,timeUnit:'years'}},
+  {id:'transmission',name:'Transmission oil',reminder:{type:'km',km:40000}},
+  {id:'battery',name:'Battery check',     reminder:{type:'both',km:30000,timeVal:2,timeUnit:'years'}},
+  {id:'wipers', name:'Wiper blades',      reminder:{type:'both',km:20000,timeVal:1,timeUnit:'years'}},
+  {id:'ac',     name:'AC service',        reminder:{type:'both',km:20000,timeVal:1,timeUnit:'years'}},
+];
+function getServiceTypes2(){
+  try{const s=JSON.parse(localStorage.getItem(LS_SVC_TYPES2)||'null');if(s)return s;}catch(e){}
+  return DEFAULT_SVC_TYPES2.map(t=>({...t}));
+}
+function saveServiceTypes2(t){
+  try{localStorage.setItem(LS_SVC_TYPES2,JSON.stringify(t));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('svc_types2',t);
+}
+function addServiceType(){
+  const name=document.getElementById('new-svc-name').value.trim();
+  if(!name){alert('Please enter a name');return;}
+  const rType=document.getElementById('new-svc-reminder-type').value;
+  const reminder={type:rType};
+  if(rType==='km'||rType==='both') reminder.km=parseInt(document.getElementById('new-svc-km').value)||0;
+  if(rType==='time'||rType==='both'){reminder.timeVal=parseInt(document.getElementById('new-svc-time-val').value)||0;reminder.timeUnit=document.getElementById('new-svc-time-unit').value;}
+  const types=getServiceTypes2();
+  types.push({id:'svc_'+Date.now(),name,reminder});
+  saveServiceTypes2(types);
+  document.getElementById('new-svc-name').value='';
+  renderServiceTypesList();toast('Service type added ✓');
+}
+function removeServiceType(id){
+  if(!confirm('Remove?'))return;
+  saveServiceTypes2(getServiceTypes2().filter(t=>t.id!==id));
+  renderServiceTypesList();
+}
+function updateSvcReminderVisibility(val){
+  const km=document.getElementById('new-svc-km-wrap');
+  const ti=document.getElementById('new-svc-time-wrap');
+  if(km) km.style.display=(val==='km'||val==='both')?'':'none';
+  if(ti) ti.style.display=(val==='time'||val==='both')?'':'none';
+}
+
+// ── Maintenance entries ──
+let maintenanceEntries=[];
+function loadMaintenanceLocal(){
+  try{const s=localStorage.getItem(LS_MAINTENANCE2);if(s)return JSON.parse(s);}catch(e){}
+  // migrate from old key
+  try{const s=localStorage.getItem('diesel_maintenance_v1');if(s)return JSON.parse(s);}catch(e){}
+  return[];
+}
+function saveMaintenanceLocal(){try{localStorage.setItem(LS_MAINTENANCE2,JSON.stringify(maintenanceEntries));}catch(e){}}
+async function loadMaintenanceFromSupabase(){
+  if(!sbUrl||!sbKey)return;
+  try{
+    const data=await sbFetch('maintenance_entries?order=date_str.desc,id.desc&limit=1000');
+    if(data){
+      maintenanceEntries=data.map(r=>({id:r.id,dateStr:r.date_str,vehicleId:r.vehicle_id||'nissan',odometer:r.odometer,services:r.services||[],costs:r.costs||{},notes:r.notes||''}));
+      saveMaintenanceLocal();
+    }
+  }catch(e){console.warn('maint load',e);}
+}
+async function sbInsertMaintenance(e){
+  if(!sbUrl||!sbKey)return e;
+  try{
+    const body={date_str:e.dateStr,vehicle_id:e.vehicleId||null,odometer:e.odometer,services:e.services,costs:e.costs,notes:e.notes||null};
+    const data=await sbFetch('maintenance_entries',{method:'POST',body:JSON.stringify(body)});
+    if(data&&data[0])return{...e,id:data[0].id};
+  }catch(err){console.warn('maint insert',err);}
+  return e;
+}
+async function sbUpdateMaintenance(e){
+  if(!sbUrl||!sbKey)return;
+  try{await sbFetch(`maintenance_entries?id=eq.${e.id}`,{method:'PATCH',body:JSON.stringify({date_str:e.dateStr,vehicle_id:e.vehicleId||null,odometer:e.odometer,services:e.services,costs:e.costs,notes:e.notes||null})});}catch(err){}
+}
+async function sbDeleteMaintenance(id){
+  if(!sbUrl||!sbKey)return;
+  try{await sbFetch(`maintenance_entries?id=eq.${id}`,{method:'DELETE'});}catch(err){}
+}
+
+// ── Last service per type per vehicle ──
+function getLastService(svcId, vehicleId){
+  const filtered=vehicleId
+    ? maintenanceEntries.filter(e=>e.vehicleId===vehicleId&&e.services&&e.services.includes(svcId))
+    : maintenanceEntries.filter(e=>e.services&&e.services.includes(svcId));
+  filtered.sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+  return filtered[0]||null;
+}
+function getCurrentOdo(vehicleId){
+  // For Nissan, use fuel fill odometer
+  const veh=getVehicles().find(v=>v.id===vehicleId);
+  if(veh&&veh.name.toLowerCase().includes('نيسان')||veh&&veh.id==='nissan'){
+    const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer).sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+    if(fills.length) return fills[0].odometer;
+  }
+  // Otherwise use last maintenance odometer
+  const maintWithOdo=maintenanceEntries.filter(e=>(!vehicleId||e.vehicleId===vehicleId)&&e.odometer).sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+  return maintWithOdo.length?maintWithOdo[0].odometer:0;
+}
+
+// ── Reminder calculation ──
+function calcNextDue(svcType, last){
+  if(!last||!svcType.reminder||svcType.reminder.type==='none') return null;
+  const r=svcType.reminder;
+  const result={};
+  if((r.type==='km'||r.type==='both')&&r.km&&last.odometer){
+    result.nextOdo=last.odometer+r.km;
+    result.km=r.km;
+  }
+  if((r.type==='time'||r.type==='both')&&r.timeVal&&r.timeUnit){
+    const d=new Date(last.dateStr);
+    if(r.timeUnit==='days') d.setDate(d.getDate()+r.timeVal);
+    else if(r.timeUnit==='months') d.setMonth(d.getMonth()+r.timeVal);
+    else if(r.timeUnit==='years') d.setFullYear(d.getFullYear()+r.timeVal);
+    result.nextDate=d;
+    result.nextDateStr=d.toISOString().split('T')[0];
+  }
+  return result;
+}
+function getStatus(svcType, last, currentOdo){
+  if(!svcType.reminder||svcType.reminder.type==='none') return null;
+  const next=calcNextDue(svcType,last);
+  if(!next) return {code:'never',label:'No history',cls:'status-ok'};
+  const today=new Date();
+  let overdueKm=false, overdueDt=false, soonKm=false, soonDt=false;
+  if(next.nextOdo){
+    const rem=next.nextOdo-currentOdo;
+    if(rem<=0) overdueKm=true;
+    else if(rem<=500) soonKm=true;
+  }
+  if(next.nextDate){
+    const daysLeft=Math.round((next.nextDate-today)/(1000*60*60*24));
+    if(daysLeft<0) overdueDt=true;
+    else if(daysLeft<=14) soonDt=true;
+  }
+  if(overdueKm||overdueDt) return{code:'overdue',label:'⚠ Overdue',cls:'status-overdue',next};
+  if(soonKm||soonDt) return{code:'soon',label:'⏰ Due soon',cls:'status-soon',next};
+  return{code:'ok',label:'✅ OK',cls:'status-ok',next};
+}
+
+// ── Render reminders table ──
+function renderReminders(){
+  const types=getServiceTypes2();
+  const vehicles=getVehicles();
+  const filterVeh=document.getElementById('svc-vehicle-filter')?.value||'';
+  const tbody=document.getElementById('reminders-body');
+  if(!tbody) return;
+  
+  const rows=[];
+  vehicles.filter(v=>!filterVeh||v.id===filterVeh).forEach(veh=>{
+    const currentOdo=getCurrentOdo(veh.id);
+    types.forEach(t=>{
+      const last=getLastService(t.id,veh.id);
+      const status=getStatus(t,last,currentOdo);
+      if(!status) return; // no reminder set
+      const next=status.next||{};
+      rows.push({veh,t,last,status,next,currentOdo});
+    });
+  });
+
+  // Sort: overdue first, then soon, then ok
+  const order={overdue:0,soon:1,ok:2,never:3};
+  rows.sort((a,b)=>(order[a.status.code]||3)-(order[b.status.code]||3));
+
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="7"><div class="empty-state">No reminders set. Add service types with intervals in the ⚙️ Service Types tab.</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=rows.map(({veh,t,last,status,next})=>{
+    const lastInfo=last?`${fmtDate(last.dateStr)}${last.odometer?' · '+last.odometer.toLocaleString()+' km':''}`:'Never';
+    const lastOdoDisp=last&&last.odometer?last.odometer.toLocaleString()+' km':'—';
+    let nextInfo='';
+    if(next.nextOdo) nextInfo+=`${next.nextOdo.toLocaleString()} km`;
+    if(next.nextDate) nextInfo+=(nextInfo?' · ':'')+fmtDate(next.nextDateStr);
+    return`<tr>
+      <td style="font-weight:600">${t.name}</td>
+      <td style="font-size:12px;color:var(--text2)">${veh.name}</td>
+      <td style="font-size:12px">${lastInfo}</td>
+      <td style="font-size:12px;text-align:right">${lastOdoDisp}</td>
+      <td style="font-size:12px;color:var(--navy)">${nextInfo||'—'}</td>
+      <td><span class="${status.cls}">${status.label}</span></td>
+      <td><button class="btn btn-p btn-sm" onclick="completeReminder('${t.id}','${veh.id}')">✓ Done</button></td>
+    </tr>`;
+  }).join('');
+
+  // Update nav badge
+  const overdueCount=rows.filter(r=>r.status.code==='overdue').length;
+  const soonCount=rows.filter(r=>r.status.code==='soon').length;
+  const badge=document.getElementById('svc-badge');
+  const banner=document.getElementById('svc-alert-banner');
+  if(badge){
+    if(overdueCount+soonCount>0){badge.style.display='inline';badge.textContent=overdueCount+soonCount;}
+    else badge.style.display='none';
+  }
+  if(banner){
+    if(overdueCount>0){
+      banner.style.display='block';
+      document.getElementById('svc-alert-content').innerHTML=
+        `${overdueCount} service${overdueCount>1?'s':''} overdue · ${soonCount} due soon`;
+    } else banner.style.display='none';
+  }
+}
+
+// ── Complete reminder → open pre-filled form ──
+function completeReminder(svcId, vehicleId){
+  // Switch to log tab and open modal pre-filled
+  showSvcTab('log', document.getElementById('stab-log'));
+  openMaintenancePanel(svcId, vehicleId);
+}
+
+// ── Render service log ──
+function renderMaintenanceLog(){
+  const types=getServiceTypes2();
+  const vehicles=getVehicles();
+  const nameMap={};types.forEach(t=>nameMap[t.id]=t.name);
+  const vehMap={};vehicles.forEach(v=>vehMap[v.id]=v.name);
+  const el=document.getElementById('maintenance-body');if(!el)return;
+  if(!maintenanceEntries.length){
+    el.innerHTML='<tr><td colspan="7"><div class="empty-state">No service visits yet. Click "+ Add visit" to start.</div></td></tr>';
+    return;
+  }
+  el.innerHTML=[...maintenanceEntries].sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr)).map(e=>{
+    const totalCost=Object.values(e.costs||{}).reduce((a,b)=>a+(parseFloat(b)||0),0);
+    const svcNames=(e.services||[]).map(id=>nameMap[id]||id);
+    return`<tr>
+      <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
+      <td style="font-size:12px">${vehMap[e.vehicleId||'nissan']||e.vehicleId||'—'}</td>
+      <td class="r" style="font-weight:600">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:4px">${svcNames.map(n=>`<span style="background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:20px;font-size:11px">${n}</span>`).join('')}</div></td>
+      <td class="r" style="font-weight:600">${totalCost?Math.round(totalCost).toLocaleString():''}</td>
+      <td class="col-hm" style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
+      <td><button class="btn-icon" onclick="openMaintenanceEdit(${e.id})">✏️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Render service types list ──
+function renderServiceTypesList(){
+  const types=getServiceTypes2();
+  const el=document.getElementById('service-types-list');if(!el)return;
+  updateSvcReminderVisibility(document.getElementById('new-svc-reminder-type')?.value||'none');
+  if(!types.length){el.innerHTML='<p style="font-size:13px;color:var(--text3);margin-bottom:10px">No service types.</p>';return;}
+  el.innerHTML=types.map(t=>{
+    const r=t.reminder;
+    let txt='No reminder';
+    if(r&&r.type!=='none'){
+      const p=[];
+      if(r.km&&(r.type==='km'||r.type==='both')) p.push(`every ${r.km.toLocaleString()} km`);
+      if(r.timeVal&&(r.type==='time'||r.type==='both')) p.push(`every ${r.timeVal} ${r.timeUnit}`);
+      txt=p.join(' + ');
+    }
+    return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px;font-weight:500;flex:1">${t.name}</span>
+      <span style="font-size:11px;color:var(--text3)">${txt}</span>
+      <button class="btn-icon del" onclick="removeServiceType('${t.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Maintenance panel ──
+let _editingMaintId=null;
+function openMaintenancePanel(preSvcId, preVehicleId){
+  _editingMaintId=null;
+  document.getElementById('maint-panel-title').textContent='New service visit';
+  document.getElementById('maint-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('maint-notes').value='';
+  document.getElementById('maint-delete-btn').style.display='none';
+  // pre-select vehicle
+  const vehSel=document.getElementById('maint-vehicle');
+  if(preVehicleId&&vehSel) vehSel.value=preVehicleId;
+  else if(vehSel&&getVehicles().length) vehSel.value=getVehicles()[0].id;
+  // set odo
+  const vehId=vehSel?vehSel.value:'nissan';
+  document.getElementById('maint-odo').value=getCurrentOdo(vehId)||'';
+  buildServiceChecklist(preSvcId?[preSvcId]:[],{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function openMaintenanceEdit(id){
+  const e=maintenanceEntries.find(x=>x.id===id);if(!e)return;
+  _editingMaintId=id;
+  document.getElementById('maint-panel-title').textContent='Edit service visit';
+  document.getElementById('maint-date').value=e.dateStr;
+  const vehSel=document.getElementById('maint-vehicle');
+  if(vehSel) vehSel.value=e.vehicleId||getVehicles()[0]?.id||'';
+  document.getElementById('maint-odo').value=e.odometer||'';
+  document.getElementById('maint-notes').value=e.notes||'';
+  document.getElementById('maint-delete-btn').style.display='inline-flex';
+  buildServiceChecklist(e.services||[],e.costs||{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function buildServiceChecklist(selected, costs){
+  const types=getServiceTypes2();
+  const el=document.getElementById('maint-services-checklist');if(!el)return;
+  el.innerHTML=types.map(t=>`
+    <label class="svc-chip ${selected.includes(t.id)?'checked':''}">
+      <input type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''} onchange="onSvcChipChange(this)">
+      ${t.name}
+    </label>`).join('');
+  renderCostInputs(selected, costs);
+}
+function onSvcChipChange(cb){
+  const lbl=cb.closest('label');
+  lbl.classList.toggle('checked',cb.checked);
+  const checked=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  const costs={};
+  document.querySelectorAll('[id^="cost-"]').forEach(i=>{if(i.value) costs[i.id.replace('cost-','')]=parseFloat(i.value)||0;});
+  renderCostInputs(checked,costs);
+}
+function renderCostInputs(selected, costs){
+  const types=getServiceTypes2();
+  const nameMap={};types.forEach(t=>nameMap[t.id]=t.name);
+  const el=document.getElementById('maint-costs');if(!el)return;
+  if(!selected.length){el.innerHTML='';updateTotalCost();return;}
+  el.innerHTML=`<div class="sec-title" style="margin-bottom:8px">Cost per service (LBP)</div>`+
+    selected.map(id=>`<div class="cost-row">
+      <span>${nameMap[id]||id}</span>
+      <input type="number" id="cost-${id}" value="${costs[id]||''}" placeholder="0" min="0" step="1000" class="cost-inp" oninput="updateTotalCost()">
+      <span style="font-size:12px;color:var(--text3)">LBP</span>
+    </div>`).join('');
+  updateTotalCost();
+}
+function updateTotalCost(){
+  const total=[...document.querySelectorAll('[id^="cost-"]')].reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+  const el=document.getElementById('maint-total-cost');
+  if(el) el.textContent=Math.round(total).toLocaleString()+' LBP';
+}
+async function saveMaintenanceEntry(){
+  const dateStr=document.getElementById('maint-date').value;
+  const vehicleId=document.getElementById('maint-vehicle').value;
+  const odometer=parseInt(document.getElementById('maint-odo').value)||null;
+  const notes=document.getElementById('maint-notes').value.trim();
+  if(!dateStr){alert('Please select a date');return;}
+  const services=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  if(!services.length){alert('Please select at least one service');return;}
+  const costs={};
+  services.forEach(id=>{const el=document.getElementById('cost-'+id);if(el&&el.value) costs[id]=parseFloat(el.value)||0;});
+  if(_editingMaintId){
+    const e=maintenanceEntries.find(x=>x.id===_editingMaintId);
+    if(e){Object.assign(e,{dateStr,vehicleId,odometer,services,costs,notes});}
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) await sbUpdateMaintenance(maintenanceEntries.find(x=>x.id===_editingMaintId));
+    toast('Updated ✓');
+  } else {
+    let entry={id:Date.now(),dateStr,vehicleId,odometer,services,costs,notes};
+    maintenanceEntries.unshift(entry);
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) entry=await sbInsertMaintenance(entry);
+    toast('Service visit saved ✓');
+  }
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+}
+async function deleteMaintenanceEntry(){
+  if(!confirm('Delete this visit?'))return;
+  if(sbUrl&&sbKey) await sbDeleteMaintenance(_editingMaintId);
+  maintenanceEntries=maintenanceEntries.filter(e=>e.id!==_editingMaintId);
+  saveMaintenanceLocal();
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+  toast('Deleted');
+}
+
+// ── Sub-tab switching ──
+function showSvcTab(name, btn){
+  document.querySelectorAll('.svc-tab-content').forEach(el=>el.style.display='none');
+  document.querySelectorAll('.svc-tab').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('svc-'+name);
+  if(el) el.style.display='block';
+  if(btn) btn.classList.add('active');
+  if(name==='reminders') renderReminders();
+  else if(name==='log') renderMaintenanceLog();
+  else if(name==='types') renderServiceTypesList();
+}
+
+// ── Full page render ──
+function renderMaintenancePage(){
+  renderReminders();
+  renderMaintenanceLog();
+  renderServiceTypesList();
+  renderVehiclesList();
+  refreshVehicleDropdowns();
+}
+
+// ── Init ──
+maintenanceEntries=loadMaintenanceLocal();
+
+
+
+// Check alerts on load
+setTimeout(()=>{
+  const types=getServiceTypes2();
+  const vehicles=getVehicles();
+  let alertCount=0;
+  vehicles.forEach(veh=>{
+    const odo=getCurrentOdo(veh.id);
+    types.forEach(t=>{
+      const last=getLastService(t.id,veh.id);
+      const st=getStatus(t,last,odo);
+      if(st&&(st.code==='overdue'||st.code==='soon')) alertCount++;
+    });
+  });
+  const badge=document.getElementById('svc-badge');
+  if(badge&&alertCount>0){badge.style.display='inline';badge.textContent=alertCount;}
+},1500);
+
+
+
+// ── Single showPage (replaces all previous) ──
+function showPage(name, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg=document.getElementById('page-'+name);
+  if(pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(name==='add') prefillAddEntry();
+  if(name==='maintenance'){renderMaintenancePage();setTimeout(()=>renderReminders(),100);}
+  if(name==='settings'){renderVehiclesList();refreshVehicleDropdowns();renderOpTypes();renderDefaultOpToggles();}
+  if(name==='nissan') renderNissan();
+}
 
 </script>
 </body>

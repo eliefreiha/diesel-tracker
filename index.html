@@ -1397,50 +1397,52 @@ function getLastNissanOdo(){
 }
 function onPersonChange(){
   const personEl=document.getElementById('inp-person');
-  const person=personEl?personEl.value:'';
+  const person=personEl?personEl.value.trim():'';
   const type=document.getElementById('inp-type').value;
   const sec=document.getElementById('odo-section');
-  // Match by name or by label (name · plate)
-  const isVehicle=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);
-  if(type==='تعبئة'&&isVehicle){
-    sec.classList.add('visible');sec.classList.remove('hidden');
-    syncQuickNissanSettings&&syncQuickNissanSettings();
-    updateOdoPreview&&updateOdoPreview();
-  } else if(type!=='تعبئة'){
+  if(type==='تعبئة'){
+    const isVehicle=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);
+    if(isVehicle){
+      sec.classList.add('visible');sec.classList.remove('hidden');
+      syncQuickNissanSettings&&syncQuickNissanSettings();
+      updateOdoPreview&&updateOdoPreview();
+    } else {
+      sec.classList.remove('visible');sec.classList.add('hidden');
+    }
+  } else {
     sec.classList.remove('visible');sec.classList.add('hidden');
   }
-  updateVoucherTotal();
+  updateVoucherTotal&&updateVoucherTotal();
 }
 function onTypeChange(){
   const t=document.getElementById('inp-type').value;
-  const person=document.getElementById('inp-person');
-  const v10=document.getElementById('inp-v10');
-  const v20=document.getElementById('inp-v20');
-  const v30=document.getElementById('inp-v30');
-
+  const personEl=document.getElementById('inp-person');
+  const sec=document.getElementById('odo-section');
+  updatePersonDropdown&&updatePersonDropdown();
   if(t==='تعبئة'){
-    v10.value=0; v20.value=0; v30.value=0;
+    const vehs=getVehicles();
+    if(vehs.length) personEl.value=vehLabel(vehs[0]);
+    document.getElementById('inp-v10').value=0;
+    document.getElementById('inp-v20').value=0;
+    document.getElementById('inp-v30').value=0;
     _actualLtManual=false;
-    updatePersonDropdown&&updatePersonDropdown();
-    // Auto-select first vehicle
-    const pp=document.getElementById('inp-person');
-    if(pp&&!pp.value&&getVehicles().length) pp.value=getVehicles()[0].name;
+    sec.classList.add('visible');sec.classList.remove('hidden');
+    syncQuickNissanSettings&&syncQuickNissanSettings();
+    updateOdoPreview&&updateOdoPreview();
   } else if(t==='استلام'){
-    updatePersonDropdown&&updatePersonDropdown();
-    // Default: Army + monthly allocation
-    if(!person.value||person.value.trim()==='') person.value='الجيش (Army)';
-    v10.value=5; v20.value=9; v30.value=9;
+    personEl.value='الجيش';
+    document.getElementById('inp-v10').value=5;
+    document.getElementById('inp-v20').value=9;
+    document.getElementById('inp-v30').value=9;
+    sec.classList.remove('visible');sec.classList.add('hidden');
   } else {
-    // Other types: reset vouchers, hide odo
-    if(t!=='شراء'){v10.value=0;v20.value=0;v30.value=0;}
-    person.value='';
+    personEl.value='';
+    if(t!=='شراء'){document.getElementById('inp-v10').value=0;document.getElementById('inp-v20').value=0;document.getElementById('inp-v30').value=0;}
     sec.classList.remove('visible');sec.classList.add('hidden');
   }
-
-  onPersonChange();
-  updateStockLabels();
-  checkStock();
-  // odo-section already handled above per type
+  updateStockLabels&&updateStockLabels();
+  checkStock&&checkStock();
+  updateVoucherTotal&&updateVoucherTotal();
 }
 function syncQuickNissanSettings(){
   // Sync quick settings from the main settings
@@ -2221,8 +2223,15 @@ function getPersonSuggestions(type){
 function updatePersonDropdown(){
   const dl=document.getElementById('persons-datalist');if(!dl)return;
   const type=(document.getElementById('inp-type')||{}).value||'';
-  const suggestions=getPersonSuggestions(type);
-  dl.innerHTML=suggestions.map(s=>'<option value="'+s+'">').join('');
+  dl.innerHTML=getPersonSuggestions(type).map(s=>'<option value="'+s+'">').join('');
+  if(type==='تعبئة'){
+    const pp=document.getElementById('inp-person');
+    if(pp&&pp.value){
+      const v=getVehicles();
+      const ok=v.some(vh=>vh.name===pp.value||vehLabel(vh)===pp.value)||isNissan(pp.value);
+      if(!ok) pp.value=v.length?vehLabel(v[0]):'';
+    }
+  }
 }
 function updateEditPersonDropdown(){
   // Same datalist is shared

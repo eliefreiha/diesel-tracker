@@ -227,6 +227,7 @@ tr:hover td{background:var(--surface2)}
   .form-row,.form-row-3,.form-row-4{grid-template-columns:1fr}
   .col-hm{display:none}
   div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  .odo-section .form-row-3{grid-template-columns:1fr 1fr}
 }
 @media(max-width:480px){
   .metrics{grid-template-columns:1fr 1fr}
@@ -334,7 +335,7 @@ tr:hover td{background:var(--surface2)}
 
     <div class="odo-section" id="odo-section">
       <div class="odo-title">🚗 Nissan — fill details</div>
-      <div class="form-row" style="margin-bottom:8px">
+      <div class="form-row-3" style="margin-bottom:8px">
         <div class="fg" style="margin-bottom:0"><label>Odometer (km)</label>
           <input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()">
         </div>

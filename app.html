@@ -2158,7 +2158,12 @@ async function loadVehiclesFromSupabase(){
   if(!sbUrl||!sbKey)return;
   try{
     const data=await sbFetch('vehicles?order=created_at.asc');
-    if(data&&data.length){cacheVehicles(data);renderVehiclesList();refreshVehicleDropdowns();}
+    if(data&&data.length){
+      cacheVehicles(data);
+      renderVehiclesList&&renderVehiclesList();
+      refreshVehicleDropdowns&&refreshVehicleDropdowns();
+    }
+    // No seeding for vehicles — new users add their own
   }catch(e){console.warn('vehicles load',e);}
 }
 async function addVehicle(){
@@ -2337,21 +2342,32 @@ async function loadSvcTypesFromSupabase(){
   if(!sbUrl||!sbKey)return;
   try{
     const data=await sbFetch('service_types?order=created_at.asc');
-    if(data&&data.length){cacheSvcTypes(data);renderServiceTypesList();}
-    else{
-      // No custom types in DB — seed defaults
+    if(data&&data.length){
+      cacheSvcTypes(data);
+      renderServiceTypesList&&renderServiceTypesList();
+    } else {
+      // New user — seed default service types
       await seedDefaultSvcTypes();
     }
   }catch(e){console.warn('svc_types load',e);}
 }
 async function seedDefaultSvcTypes(){
   if(!sbUrl||!sbKey)return;
+  console.log('Seeding default service types for new user...');
   try{
     for(const t of DEFAULT_SVC_TYPES2){
-      await sbFetch('service_types',{method:'POST',headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({id:t.id,name:t.name,reminder:t.reminder})});
+      await sbFetch('service_types',{
+        method:'POST',
+        headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},
+        body:JSON.stringify({id:t.id+'_'+Date.now(),name:t.name,reminder:t.reminder,active:true})
+      });
     }
     const data=await sbFetch('service_types?order=created_at.asc');
-    if(data&&data.length) cacheSvcTypes(data);
+    if(data&&data.length){
+      cacheSvcTypes(data);
+      renderServiceTypesList&&renderServiceTypesList();
+      console.log('Default service types seeded ✓');
+    }
   }catch(e){console.warn('seed svc types',e);}
 }
 async function addServiceType(){

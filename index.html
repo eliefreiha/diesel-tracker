@@ -2067,7 +2067,7 @@ function renderReminders(){
     const li=last?fmtDate(last.dateStr)+(last.odometer?' · '+last.odometer.toLocaleString()+' km':''):'—';
     const lo=last&&last.odometer?last.odometer.toLocaleString()+' km':'—';
     let ni='';if(st.next){if(st.next.nextOdo)ni+=st.next.nextOdo.toLocaleString()+' km';if(st.next.nextDateStr)ni+=(ni?' · ':'')+fmtDate(st.next.nextDateStr);}
-    return'<tr><td style="font-weight:600">'+t.name+'</td><td style="font-size:12px;color:var(--text2)">'+veh.name+'</td><td style="font-size:12px">'+li+'</td><td class="r" style="font-size:12px">'+lo+'</td><td style="font-size:12px;color:var(--navy)">'+(ni||'—')+'</td><td><span class="'+st.cls+'">'+st.label+'</span></td><td><button class="btn btn-p btn-sm" onclick="completeReminder('+JSON.stringify(t.id)+','+JSON.stringify(veh.id)+')">Done</button></td></tr>';
+    return'<tr><td style="font-weight:600">'+t.name+'</td><td style="font-size:12px;color:var(--text2)">'+veh.name+'</td><td style="font-size:12px">'+li+'</td><td class="r" style="font-size:12px">'+lo+'</td><td style="font-size:12px;color:var(--navy)">'+(ni||'—')+'</td><td><span class="'+st.cls+'">'+st.label+'</span></td><td><button class="btn btn-p btn-sm" onclick="completeReminder(this.dataset.svc,this.dataset.veh)" data-svc="'+t.id+'" data-veh="'+veh.id+'">&#10003; Done</button></td></tr>';
   }).join('');
   const oc=rows.filter(r=>r.st.code==='overdue').length,sc=rows.filter(r=>r.st.code==='soon').length;
   const badge=document.getElementById('svc-badge');if(badge){if(oc+sc>0){badge.style.display='inline';badge.textContent=oc+sc;}else badge.style.display='none';}

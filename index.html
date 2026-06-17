@@ -1295,6 +1295,7 @@ function prefillAddEntry(){
   updatePersonDropdown&&updatePersonDropdown();
   if(vehs.length) personEl.value=vehLabel(vehs[0]);
   else personEl.value=NISSAN_PERSON;
+  onPersonChange&&onPersonChange();
 
   // Reset vouchers
   document.getElementById('inp-v10').value=0;
@@ -1400,9 +1401,13 @@ function onPersonChange(){
   const person=personEl?personEl.value.trim():'';
   const type=document.getElementById('inp-type').value;
   const sec=document.getElementById('odo-section');
+
   if(type==='تعبئة'){
-    const isVehicle=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);
-    if(isVehicle){
+    // Show odo section — for any vehicle or if person field has a value
+    const vehs=getVehicles();
+    const isVehicle=vehs.some(v=>v.name===person||vehLabel(v)===person)
+      ||isNissan(person)||vehs.length>0&&person.length>0;
+    if(isVehicle||vehs.length>0){
       sec.classList.add('visible');sec.classList.remove('hidden');
       syncQuickNissanSettings&&syncQuickNissanSettings();
       updateOdoPreview&&updateOdoPreview();
@@ -1418,7 +1423,9 @@ function onTypeChange(){
   const t=document.getElementById('inp-type').value;
   const personEl=document.getElementById('inp-person');
   const sec=document.getElementById('odo-section');
+
   updatePersonDropdown&&updatePersonDropdown();
+
   if(t==='تعبئة'){
     const vehs=getVehicles();
     if(vehs.length) personEl.value=vehLabel(vehs[0]);
@@ -1426,20 +1433,22 @@ function onTypeChange(){
     document.getElementById('inp-v20').value=0;
     document.getElementById('inp-v30').value=0;
     _actualLtManual=false;
-    sec.classList.add('visible');sec.classList.remove('hidden');
-    syncQuickNissanSettings&&syncQuickNissanSettings();
-    updateOdoPreview&&updateOdoPreview();
   } else if(t==='استلام'){
     personEl.value='الجيش';
     document.getElementById('inp-v10').value=5;
     document.getElementById('inp-v20').value=9;
     document.getElementById('inp-v30').value=9;
-    sec.classList.remove('visible');sec.classList.add('hidden');
   } else {
     personEl.value='';
-    if(t!=='شراء'){document.getElementById('inp-v10').value=0;document.getElementById('inp-v20').value=0;document.getElementById('inp-v30').value=0;}
-    sec.classList.remove('visible');sec.classList.add('hidden');
+    if(t!=='شراء'){
+      document.getElementById('inp-v10').value=0;
+      document.getElementById('inp-v20').value=0;
+      document.getElementById('inp-v30').value=0;
+    }
   }
+
+  // Always call onPersonChange to handle odo section show/hide
+  onPersonChange();
   updateStockLabels&&updateStockLabels();
   checkStock&&checkStock();
   updateVoucherTotal&&updateVoucherTotal();
@@ -2500,6 +2509,9 @@ function openAddPanel(){
     [...form.children].forEach(c=>panel.appendChild(c));
   }
   prefillAddEntry();
+  // Ensure type is set to تعبئة and trigger full init
+  const typeEl=document.getElementById('inp-type');
+  if(typeEl&&typeEl.value==='تعبئة') onTypeChange();
 }
 function closeAddPanel(){
   document.getElementById('add-overlay').style.display='none';

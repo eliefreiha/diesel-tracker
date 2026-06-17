@@ -1984,10 +1984,14 @@ function renderAll(){
 }
 function showPage(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
   if(name==='add') prefillAddEntry();
+  if(name==='maintenance'){renderMaintenancePage&&renderMaintenancePage();setTimeout(()=>{renderReminders&&renderReminders();},150);}
+  if(name==='settings'){renderVehiclesList&&renderVehiclesList();refreshVehicleDropdowns&&refreshVehicleDropdowns();renderOpTypes&&renderOpTypes();renderDefaultOpToggles&&renderDefaultOpToggles();}
+  if(name==='nissan') renderNissan&&renderNissan();
+  if(name==='fuel'){fcRecalc&&fcRecalc();fcInit&&fcInit();}
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
 

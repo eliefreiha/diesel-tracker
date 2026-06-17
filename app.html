@@ -2020,9 +2020,14 @@ function showPage(name,btn){
     const pi=document.getElementById('fc-price20');
     if(fi&&!parseFloat(fi.value)) fi.value=localStorage.getItem('diesel_fee_lbp_per20')||115000;
     if(pi&&!parseFloat(pi.value)) pi.value=localStorage.getItem('diesel_fuel_price_20')||2350000;
-    if(typeof fcRecalc==='function') fcRecalc();
-    setTimeout(()=>{if(typeof fcRecalc==='function') fcRecalc();},300);
-    setTimeout(()=>{if(typeof fcRecalc==='function') fcRecalc();},800);
+    console.log('FUEL TAB: price=',pi&&pi.value,'fee=',fi&&fi.value);
+    console.log('FUEL TAB: fcRecalc type=',typeof fcRecalc);
+    console.log('FUEL TAB: fc-table-m2=',document.getElementById('fc-table-m2'));
+    if(typeof fcRecalc==='function'){
+      fcRecalc();
+      console.log('FUEL TAB: fcRecalc called, table innerHTML=',document.getElementById('fc-table-m2')&&document.getElementById('fc-table-m2').innerHTML.length,'chars');
+    }
+    setTimeout(()=>{fcRecalc&&fcRecalc();},500);
   }
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));

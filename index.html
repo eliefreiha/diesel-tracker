@@ -1000,7 +1000,7 @@ async function sbGetSetting(k){
 }
 async function sbSetSetting(k,v){
   try{
-    await sbFetch('app_settings',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal','Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+    await sbFetch('app_settings',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:k,value:v})});
   }catch(e){console.warn('sbSetSetting failed',e);}
 }
 async function loadSettingsFromSupabase(){

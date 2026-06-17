@@ -2695,7 +2695,7 @@ function fcInit(){
       const inp20=document.getElementById('fc-price20');
       if(fee&&parseFloat(fee)>0&&inpFee){inpFee.value=fee;changed=true;}
       if(price&&parseFloat(price)>0&&inp20){inp20.value=price;changed=true;}
-      if(changed) fcRecalc();
+      fcRecalc(); // Always recalc after Supabase load
       // Auto-fetch if price is stale (>6hrs)
       try{const s=JSON.parse(localStorage.getItem(FC_LS)||'{}');
         if(!s.fetchedAt||(Date.now()-s.fetchedAt)>6*3600*1000) fcFetchPrice();
@@ -2706,6 +2706,7 @@ function fcInit(){
       if(!s.fetchedAt||(Date.now()-s.fetchedAt)>6*3600*1000) fcFetchPrice();
     }catch(e){fcFetchPrice();}
   }
+  fcRecalc(); // Always recalc at end of init
 }
 
 </script>

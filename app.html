@@ -753,7 +753,10 @@ tr:hover td{background:var(--surface2)}
 
   <!-- Settings -->
   <div class="form-card">
-    <div class="sec-title" style="margin-bottom:10px">Settings</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="sec-title" style="margin-bottom:0">Settings</div>
+      <button onclick="fcRecalc()" class="btn btn-p btn-sm">⟳ Calculate</button>
+    </div>
     <div class="form-row">
       <div class="fg" style="margin-bottom:0">
         <label>Price per 20L صفيحة (LBP)</label>
@@ -2020,14 +2023,8 @@ function showPage(name,btn){
     const pi=document.getElementById('fc-price20');
     if(fi&&!parseFloat(fi.value)) fi.value=localStorage.getItem('diesel_fee_lbp_per20')||115000;
     if(pi&&!parseFloat(pi.value)) pi.value=localStorage.getItem('diesel_fuel_price_20')||2350000;
-    console.log('FUEL TAB: price=',pi&&pi.value,'fee=',fi&&fi.value);
-    console.log('FUEL TAB: fcRecalc type=',typeof fcRecalc);
-    console.log('FUEL TAB: fc-table-m2=',document.getElementById('fc-table-m2'));
-    if(typeof fcRecalc==='function'){
-      fcRecalc();
-      console.log('FUEL TAB: fcRecalc called, table innerHTML=',document.getElementById('fc-table-m2')&&document.getElementById('fc-table-m2').innerHTML.length,'chars');
-    }
-    setTimeout(()=>{fcRecalc&&fcRecalc();},500);
+    if(typeof fcRecalc==='function') fcRecalc();
+    setTimeout(()=>{if(typeof fcRecalc==='function') fcRecalc();},500);
   }
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));

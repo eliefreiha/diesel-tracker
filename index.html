@@ -286,7 +286,7 @@ tr:hover td{background:var(--surface2)}
     <div class="conn-pill"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting</span></div>
     <button class="hbtn" onclick="openSetup()">⚙ <span>Supabase</span></button>
     <button class="hbtn" onclick="exportCSV()">⬇ <span>CSV</span></button>
-    <a href="fuel-calculator.html" class="hbtn">💰 <span>Fuel</span></a>
+    
   </div>
 </header>
 
@@ -296,6 +296,7 @@ tr:hover td{background:var(--surface2)}
   <button class="nav-btn" id="nav-nissan" onclick="showPage('nissan',this)"><span class="ni">🚗</span>Nissan</button>
   <button class="nav-btn" id="nav-maintenance" onclick="showPage('maintenance',this)"><span class="ni">🔧</span>Service<span id="svc-badge" style="display:none;background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;margin-left:3px;vertical-align:top">!</span></button>
   <button class="nav-btn" id="nav-stats" onclick="showPage('stats',this)"><span class="ni">📊</span>Stats</button>
+  <button class="nav-btn" id="nav-fuel" onclick="showPage('fuel',this)"><span class="ni">⛽</span>Fuel</button>
   <button class="nav-btn" id="nav-settings" onclick="showPage('settings',this)"><span class="ni">⚙️</span>Settings</button>
 </nav>
 
@@ -740,6 +741,76 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- FUEL PAGE -->
+<div id="page-fuel" class="page">
+  <!-- Price hero -->
+  <div style="background:var(--navy);color:#fff;border-radius:var(--r);padding:16px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+    <div style="flex:1;min-width:180px">
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.5px">صفيحة 20L · 95 Oct</div><div style="font-size:22px;font-weight:700;line-height:1.1" id="h-p20">—</div><div style="font-size:10px;opacity:.5">LBP per 20L</div></div>
+        <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.5px">Per liter</div><div style="font-size:22px;font-weight:700;line-height:1.1" id="h-plt">—</div><div style="font-size:10px;opacity:.5">LBP / L</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <span class="conn-dot" id="pdot" style="width:7px;height:7px;border-radius:50%;background:#aaa;flex-shrink:0"></span>
+        <span style="font-size:11px;opacity:.7" id="pstatus">Loading...</span>
+        <span style="font-size:11px;opacity:.6;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px;display:none" id="pupdate"></span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <a href="https://www.iptgroup.com.lb/ipt/en/our-stations/fuel-prices" target="_blank" style="font-size:11px;color:rgba(255,255,255,.6);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:3px 8px;border-radius:4px">IPT ↗</a>
+        <a href="https://totalenergies.com.lb/en/service-station/fuels/fuel-prices" target="_blank" style="font-size:11px;color:rgba(255,255,255,.6);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:3px 8px;border-radius:4px">TotalEnergies ↗</a>
+      </div>
+    </div>
+    <button onclick="fcFetchPrice()" id="fetch-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 14px;border-radius:var(--rs);font-size:12px;cursor:pointer;white-space:nowrap">🔄 Refresh</button>
+  </div>
+
+  <!-- Settings -->
+  <div class="form-card">
+    <div class="sec-title" style="margin-bottom:10px">Settings</div>
+    <div class="form-row">
+      <div class="fg" style="margin-bottom:0">
+        <label>Price per 20L صفيحة (LBP)</label>
+        <input type="number" id="fc-price20" value="2350000" step="1000" oninput="fcOnManual()">
+        <span class="hint" id="price-hint">Auto-fetched · edit to override</span>
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <label>Cash fee per 20L voucher (LBP)</label>
+        <input type="number" id="fc-fee-lbp" value="115000" step="1000" oninput="fcRecalc();fcSave()">
+        <span class="hint">Same as Nissan Settings cash fee</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two tables side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <!-- Mode 2 table -->
+    <div style="background:var(--surface);border-radius:var(--r);overflow:hidden;border:1px solid var(--border);box-shadow:var(--sh)">
+      <div style="padding:10px 14px;font-size:13px;font-weight:600;color:#fff;background:var(--green)">💰 Mode 2 — Cash fee<div style="font-size:10px;font-weight:400;opacity:.8;margin-top:1px">Station deducts LBP cash</div></div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr>
+          <th style="padding:7px 11px;text-align:center;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Liters</th>
+          <th style="padding:7px 11px;text-align:right;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Actual (L)</th>
+          <th style="padding:7px 11px;text-align:right;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Fee (LBP)</th>
+          <th style="padding:7px 11px;text-align:right;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Value (LBP)</th>
+        </tr></thead>
+        <tbody id="fc-table-m2"></tbody>
+      </table>
+    </div>
+    <!-- Mode 1 table -->
+    <div style="background:var(--surface);border-radius:var(--r);overflow:hidden;border:1px solid var(--border);box-shadow:var(--sh)">
+      <div style="padding:10px 14px;font-size:13px;font-weight:600;color:#fff;background:#854d0e">⚡ Mode 1 — Liter deduction<div style="font-size:10px;font-weight:400;opacity:.8;margin-top:1px">Station takes liters</div></div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr>
+          <th style="padding:7px 11px;text-align:center;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Liters</th>
+          <th style="padding:7px 11px;text-align:right;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Actual (L)</th>
+          <th style="padding:7px 11px;text-align:right;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Deducted</th>
+          <th style="padding:7px 11px;text-align:right;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;background:var(--surface2);border-bottom:1px solid var(--border)">Value (LBP)</th>
+        </tr></thead>
+        <tbody id="fc-table-m1"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT MODAL -->
 <div class="modal-bg" id="edit-modal">
   <div class="modal">
@@ -1089,6 +1160,9 @@ async function loadSettingsFromSupabase(){
   refreshAllDropdowns&&refreshAllDropdowns();
   loadNissanSettings&&loadNissanSettings();
   if(typeof renderVehiclesList==='function'){renderVehiclesList();refreshVehicleDropdowns();}
+  // Sync fee to fuel calc if open
+  const fcFeeEl=document.getElementById('fc-fee-lbp');
+  if(fcFeeEl) fcFeeEl.value=getNissanFeeLbp();
 }
 function clearCacheReload(){localStorage.removeItem("diesel_tracker_v1");localStorage.removeItem("diesel_tracker_v2");localStorage.removeItem("diesel_tracker_v3");localStorage.removeItem(LS_KEY);toast("Cache cleared — reloading...");setTimeout(()=>location.reload(),800);}
 function clearSetup(){if(!confirm('Disconnect from Supabase? Data already synced stays in DB.'))return;sbUrl='';sbKey='';localStorage.removeItem(CFG_KEY);closeModal('setup-modal');setConnStatus('offline','Not connected');toast('Disconnected');}
@@ -2319,6 +2393,118 @@ function updateStockMiniBar(){
 document.addEventListener('DOMContentLoaded', function(){
   setTimeout(updateStockMiniBar, 2000);
 });
+
+// ── Fuel Calculator Module ──
+const FC_LS = 'fuel_calc_v5';
+let fcAutoFetched=false, fcLastPriceDate=null, fcLastPriceSrc=null;
+const fcFmt=n=>Math.round(n).toLocaleString();
+const fcFmtLt=n=>(+n).toFixed(1);
+function fcGetP(){return parseFloat((document.getElementById('fc-price20')||{}).value)||2350000;}
+function fcGetFee(){return parseFloat((document.getElementById('fc-fee-lbp')||{}).value)||0;}
+function fcGetDLt(){return 1;} // Mode 1 deduction — fixed at 1L per 20L
+function fcActualM1(nom){return nom-(fcGetDLt()/20)*nom;}
+function fcActualM2(nom){const plt=fcGetP()/20;return nom-(fcGetFee()*(nom/20))/plt;}
+function fcOnManual(){
+  fcAutoFetched=false;
+  const hint=document.getElementById('price-hint');
+  if(hint)hint.textContent='Manually overridden';
+  const pdot=document.getElementById('pdot');
+  if(pdot)pdot.className='conn-dot offline';
+  const ps=document.getElementById('pstatus');
+  if(ps)ps.textContent='Price manually set';
+  fcRecalc();fcSave();
+}
+function fcRecalc(){
+  const p=fcGetP(),plt=p/20;
+  const hp20=document.getElementById('h-p20');if(hp20)hp20.textContent=fcFmt(p);
+  const hplt=document.getElementById('h-plt');if(hplt)hplt.textContent=fcFmt(plt);
+  let r1='',r2='';
+  for(let nom=10;nom<=100;nom+=10){
+    const a2=fcActualM2(nom),fee2=fcGetFee()*(nom/20);
+    r2+='<tr><td style="text-align:center;font-weight:700;padding:8px 11px;border-bottom:1px solid var(--border)">'+nom+'</td>'+
+      '<td style="text-align:right;color:var(--green);font-weight:600;padding:8px 11px;border-bottom:1px solid var(--border)">'+fcFmtLt(a2)+' L</td>'+
+      '<td style="text-align:right;color:var(--red);padding:8px 11px;border-bottom:1px solid var(--border)">&minus;'+fcFmt(fee2)+'</td>'+
+      '<td style="text-align:right;padding:8px 11px;border-bottom:1px solid var(--border)">'+fcFmt(a2*plt)+'</td></tr>';
+    const a1=fcActualM1(nom),ded1=fcGetDLt()/20*nom;
+    r1+='<tr><td style="text-align:center;font-weight:700;padding:8px 11px;border-bottom:1px solid var(--border)">'+nom+'</td>'+
+      '<td style="text-align:right;color:var(--green);font-weight:600;padding:8px 11px;border-bottom:1px solid var(--border)">'+fcFmtLt(a1)+' L</td>'+
+      '<td style="text-align:right;color:var(--red);padding:8px 11px;border-bottom:1px solid var(--border)">&minus;'+fcFmtLt(ded1)+' L</td>'+
+      '<td style="text-align:right;padding:8px 11px;border-bottom:1px solid var(--border)">'+fcFmt(a1*plt)+'</td></tr>';
+  }
+  const tm2=document.getElementById('fc-table-m2');if(tm2)tm2.innerHTML=r2;
+  const tm1=document.getElementById('fc-table-m1');if(tm1)tm1.innerHTML=r1;
+}
+function fcSave(){
+  try{
+    localStorage.setItem(FC_LS,JSON.stringify({price20:fcGetP(),deductLbp:fcGetFee(),fetchedAt:fcAutoFetched?Date.now():null,priceDate:fcLastPriceDate,priceSrc:fcLastPriceSrc}));
+    localStorage.setItem('diesel_fee_lbp_per20',fcGetFee());
+    localStorage.setItem('diesel_fuel_price_20',fcGetP());
+  }catch(e){}
+  if(sbUrl&&sbKey){sbSetSetting('fuel_fee_lbp',fcGetFee());sbSetSetting('fuel_price_20_lbp',fcGetP());}
+  // Sync to nissan settings
+  const nisInp=document.getElementById('nissan-fee-lbp');
+  if(nisInp){nisInp.value=fcGetFee();saveNissanSettings&&saveNissanSettings();}
+}
+async function fcFetchPrice(){
+  const btn=document.getElementById('fetch-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  const pdot=document.getElementById('pdot');const ps=document.getElementById('pstatus');
+  if(pdot)pdot.className='conn-dot loading';if(ps)ps.textContent='Fetching...';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:200,tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:'Current price of 95 octane per 20L صفيحة in Lebanon LBP today. Return ONLY JSON: {"price20":2350000,"date":"17 Jun 2026","source":"IPT"}'}]})});
+    const d=await res.json();
+    let txt='';for(const b of(d.content||[])){if(b.type==='text'){txt=b.text;break;}}
+    const m=txt.match(/\{[^}]+\}/);
+    if(m){const parsed=JSON.parse(m[0]);if(parsed.price20&&parsed.price20>500000){
+      const inp=document.getElementById('fc-price20');if(inp)inp.value=parsed.price20;
+      fcAutoFetched=true;fcLastPriceDate=parsed.date||'today';fcLastPriceSrc=parsed.source||'web';
+      const hint=document.getElementById('price-hint');if(hint)hint.textContent='Auto-fetched · '+fcLastPriceDate+' · '+fcLastPriceSrc;
+      if(pdot)pdot.className='conn-dot online';if(ps)ps.textContent='Live · '+fcLastPriceSrc;
+      const pu=document.getElementById('pupdate');if(pu){pu.textContent='Updated: '+fcLastPriceDate;pu.style.display='inline';}
+      fcRecalc();fcSave();
+      if(btn){btn.textContent='✓';setTimeout(()=>{btn.textContent='🔄 Refresh';btn.disabled=false;},2000);}
+      return;
+    }}
+    throw new Error('parse failed');
+  }catch(e){
+    if(pdot)pdot.className='conn-dot offline';if(ps)ps.textContent='Auto-fetch failed — showing saved';
+    if(btn){btn.textContent='🔄 Retry';btn.disabled=false;}
+  }
+}
+function fcInit(){
+  // Load from localStorage
+  try{
+    const s=JSON.parse(localStorage.getItem(FC_LS)||'{}');
+    const sharedFee=localStorage.getItem('diesel_fee_lbp_per20');
+    const sharedPrice=localStorage.getItem('diesel_fuel_price_20');
+    const inp20=document.getElementById('fc-price20');
+    const inpFee=document.getElementById('fc-fee-lbp');
+    if(inp20&&(sharedPrice||s.price20)) inp20.value=sharedPrice||s.price20;
+    if(inpFee&&(sharedFee||s.deductLbp!==undefined)) inpFee.value=sharedFee||s.deductLbp;
+  }catch(e){}
+  fcRecalc();
+  // Load from Supabase
+  if(sbUrl&&sbKey){
+    Promise.all([sbGetSetting('fuel_fee_lbp'),sbGetSetting('fuel_price_20_lbp')]).then(([fee,price])=>{
+      let changed=false;
+      const inpFee=document.getElementById('fc-fee-lbp');
+      const inp20=document.getElementById('fc-price20');
+      if(fee&&parseFloat(fee)>0&&inpFee){inpFee.value=fee;changed=true;}
+      if(price&&parseFloat(price)>0&&inp20){inp20.value=price;changed=true;}
+      if(changed) fcRecalc();
+      // Auto-fetch if price is stale (>6hrs)
+      try{const s=JSON.parse(localStorage.getItem(FC_LS)||'{}');
+        if(!s.fetchedAt||(Date.now()-s.fetchedAt)>6*3600*1000) fcFetchPrice();
+      }catch(e){fcFetchPrice();}
+    });
+  } else {
+    try{const s=JSON.parse(localStorage.getItem(FC_LS)||'{}');
+      if(!s.fetchedAt||(Date.now()-s.fetchedAt)>6*3600*1000) fcFetchPrice();
+    }catch(e){fcFetchPrice();}
+  }
+}
 
 </script>
 </body>

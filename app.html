@@ -1798,8 +1798,16 @@ function renderNissan(){
 
   // Sort ALL Nissan fills by date ascending
   const filterVeh=(document.getElementById('nissan-vehicle-filter')||{}).value||'';
+  const allVehs=getVehicles();
   const fills=entries
-    .filter(e=>e.type==='تعبئة'&&(filterVeh?e.person===filterVeh:(isNissan(e.person)||getVehicles().some(v=>v.name===e.person))))
+    .filter(e=>{
+      if(e.type!=='تعبئة') return false;
+      if(filterVeh){
+        // Match by name or vehLabel
+        return e.person===filterVeh||allVehs.some(v=>v.name===filterVeh&&(e.person===v.name||e.person===vehLabel(v)));
+      }
+      return isNissan(e.person)||allVehs.some(v=>v.name===e.person||vehLabel(v)===e.person);
+    })
     .sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
 
   function effectiveLt(e){

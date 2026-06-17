@@ -2495,16 +2495,28 @@ setTimeout(function(){
 function openAddPanel(){
   document.getElementById('add-overlay').style.display='block';
   document.getElementById('add-panel').classList.add('open');
-  // Move add form content into panel
+  // Move add form content into panel (only first time)
   const form=document.getElementById('page-add');
   const panel=document.getElementById('add-panel-content');
   if(form&&panel&&!panel.hasChildNodes()){
     [...form.children].forEach(c=>panel.appendChild(c));
   }
-  prefillAddEntry();
-  // Ensure type is set to تعبئة and trigger full init
+  // Always reset and prefill fresh
   const typeEl=document.getElementById('inp-type');
-  if(typeEl&&typeEl.value==='تعبئة') onTypeChange();
+  if(typeEl) typeEl.value='تعبئة';
+  const personEl=document.getElementById('inp-person');
+  if(personEl) personEl.value='';
+  // Update datalist with current vehicles
+  updatePersonDropdown&&updatePersonDropdown();
+  // Set person to first vehicle
+  const vehs=getVehicles();
+  if(personEl&&vehs.length) personEl.value=vehLabel(vehs[0]);
+  // Show odo section
+  const sec=document.getElementById('odo-section');
+  if(sec){sec.classList.add('visible');sec.classList.remove('hidden');}
+  // Full prefill (date, odo, etc)
+  prefillAddEntry();
+  syncQuickNissanSettings&&syncQuickNissanSettings();
 }
 function closeAddPanel(){
   document.getElementById('add-overlay').style.display='none';

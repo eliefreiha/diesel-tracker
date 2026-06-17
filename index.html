@@ -1290,7 +1290,9 @@ async function loadFromSupabase(){
 
 async function sbInsert(entry){
   if(!sbUrl||!sbKey)return entry;
+  const uid=currentUser&&(currentUser.id||currentUser.sub);
   const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt!==undefined?entry.actualLt:null,full_fill:entry.fullFill!==undefined?entry.fullFill:true,notes:entry.notes||null};
+  if(uid) body.user_id=uid;
   const data=await sbFetch('diesel_entries',{method:'POST',body:JSON.stringify(body)});
   return data?{...entry,id:data[0].id}:entry;
 }

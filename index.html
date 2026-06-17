@@ -1402,11 +1402,12 @@ function onPersonChange(){
   const sec=document.getElementById('odo-section');
   // Match by name or by label (name · plate)
   const isVehicle=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);
-  if(isVehicle&&type==='تعبئة'){
-    sec.classList.remove('hidden');sec.classList.add('visible');
-    syncQuickNissanSettings();updateOdoPreview();
-  }else{
-    sec.classList.add('hidden');sec.classList.remove('visible');
+  if(type==='تعبئة'&&isVehicle){
+    sec.classList.add('visible');sec.classList.remove('hidden');
+    syncQuickNissanSettings&&syncQuickNissanSettings();
+    updateOdoPreview&&updateOdoPreview();
+  } else if(type!=='تعبئة'){
+    sec.classList.remove('visible');sec.classList.add('hidden');
   }
   updateVoucherTotal();
 }
@@ -1430,14 +1431,16 @@ function onTypeChange(){
     if(!person.value||person.value.trim()==='') person.value='الجيش (Army)';
     v10.value=5; v20.value=9; v30.value=9;
   } else {
-    // Reset vouchers to 0 when switching to other types
+    // Other types: reset vouchers, hide odo
     if(t!=='شراء'){v10.value=0;v20.value=0;v30.value=0;}
+    person.value='';
+    sec.classList.remove('visible');sec.classList.add('hidden');
   }
 
   onPersonChange();
   updateStockLabels();
   checkStock();
-  if(t!=='تعبئة') document.getElementById('odo-section').classList.remove('visible');document.getElementById('odo-section').classList.remove('hidden');document.getElementById('odo-section').classList.add('visible');
+  // odo-section already handled above per type
 }
 function syncQuickNissanSettings(){
   // Sync quick settings from the main settings
@@ -2200,18 +2203,18 @@ function vehLabel(vh){return vh.plate?vh.name+' · '+vh.plate:vh.name;}
 function getPersonSuggestions(type){
   const v=getVehicles();
   const vehOptions=v.map(vh=>vehLabel(vh));
-  // Get unique persons from existing entries
+  // All unique persons from entries history
   const existing=[...new Set(entries.map(e=>e.person).filter(Boolean))].sort();
-  // Exclude vehicle names to avoid duplicates, exclude الجيش for non-received
-  const people=existing.filter(p=>!v.some(vh=>vh.name===p)&&p!=='الجيش');
+  const people=existing.filter(p=>!v.some(vh=>vh.name===p));
   if(type==='تعبئة'){
-    // Car fill: only vehicles
+    // Car fill: only saved vehicles with plate
     return vehOptions;
   } else if(type==='استلام'){
-    // Received: Army first + existing people
-    return['الجيش (Army)',...people,...vehOptions];
+    // Received: Army first, then everyone from history
+    const others=people.filter(p=>p!=='الجيش');
+    return['الجيش',...others,...vehOptions];
   } else {
-    // Other: all people + vehicles
+    // All other types: everyone from history + vehicles
     return[...people,...vehOptions];
   }
 }
@@ -2220,14 +2223,6 @@ function updatePersonDropdown(){
   const type=(document.getElementById('inp-type')||{}).value||'';
   const suggestions=getPersonSuggestions(type);
   dl.innerHTML=suggestions.map(s=>'<option value="'+s+'">').join('');
-  // For car fill, if empty auto-fill first vehicle
-  if(type==='تعبئة'){
-    const pp=document.getElementById('inp-person');
-    if(pp&&!pp.value){
-      const v=getVehicles();
-      if(v.length) pp.value=vehLabel(v[0]);
-    }
-  }
 }
 function updateEditPersonDropdown(){
   // Same datalist is shared

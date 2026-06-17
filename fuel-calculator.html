@@ -172,6 +172,27 @@ tr:hover td{background:var(--surface2)}
 
 <script>
 const LS = 'fuel_calc_v5';
+const SB_URL = 'https://vubtcaleouuqktscjiqy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1YnRjYWxlb3V1cWt0c2NqaXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MTk1OTcsImV4cCI6MjA5NzA5NTU5N30.IMmXYM17U9SS5vUlCyEL7iDdYzbV1ZnPdyYN_GuKKDM';
+
+async function sbGet(key){
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/app_settings?key=eq.'+encodeURIComponent(key)+'&select=value',{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}
+    });
+    const d=await r.json();
+    return d&&d[0]?d[0].value:null;
+  }catch(e){return null;}
+}
+async function sbSet(key,value){
+  try{
+    await fetch(SB_URL+'/rest/v1/app_settings',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({key,value})
+    });
+  }catch(e){console.warn('sbSet failed',e);}
+}
 let autoFetched = false, lastPriceDate = null, lastPriceSource = null;
 
 const fmt   = n => Math.round(n).toLocaleString();
@@ -231,10 +252,12 @@ function save() {
       fetchedAt: autoFetched ? Date.now() : null,
       priceDate: lastPriceDate, priceSrc: lastPriceSource
     }));
-    // Shared keys — synced with tracker Nissan settings
     localStorage.setItem('diesel_fee_lbp_per20', getFee());
     localStorage.setItem('diesel_fuel_price_20', getP());
   } catch(e) {}
+  // Save to Supabase
+  sbSet('fuel_fee_lbp', getFee());
+  sbSet('fuel_price_20_lbp', getP());
 }
 
 function loadSaved() {
@@ -303,6 +326,23 @@ async function fetchPrice() {
 // ── Init ──
 const saved = loadSaved();
 recalc();
+// Load from Supabase and update if different
+(async()=>{
+  const sbFee=await sbGet('fuel_fee_lbp');
+  const sbPrice=await sbGet('fuel_price_20_lbp');
+  let changed=false;
+  if(sbFee&&parseFloat(sbFee)>0){
+    document.getElementById('deduct-lbp').value=sbFee;
+    localStorage.setItem('diesel_fee_lbp_per20',sbFee);
+    changed=true;
+  }
+  if(sbPrice&&parseFloat(sbPrice)>0){
+    document.getElementById('price20').value=sbPrice;
+    localStorage.setItem('diesel_fuel_price_20',sbPrice);
+    changed=true;
+  }
+  if(changed) recalc();
+})();
 if (saved.fetchedAt && (Date.now() - saved.fetchedAt) < 6 * 3600 * 1000) {
   autoFetched = true;
   document.getElementById('price-hint').textContent = `Auto-fetched · ${lastPriceDate || ''} · ${lastPriceSource || ''}`;

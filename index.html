@@ -1884,7 +1884,8 @@ function renderNissan(){
     overallDist=lastFull.odometer-firstFull.odometer;
     // Use last full fill liters only (distance ÷ last fill liters × base)
     overallLt=effectiveLt(lastFull);
-    overallEff=(overallDist/overallLt*base).toFixed(1);
+    if(overallLt>0&&overallDist>0){
+      overallEff=(overallDist/overallLt*base).toFixed(1);
     }
   }
 

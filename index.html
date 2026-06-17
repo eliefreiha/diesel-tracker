@@ -1004,21 +1004,27 @@ async function sbSetSetting(k,v){
   }catch(e){console.warn('sbSetSetting failed',e);}
 }
 async function loadSettingsFromSupabase(){
-  const ops=await sbGetSetting('custom_op_types');
-  if(ops&&Array.isArray(ops)){try{localStorage.setItem(LS_OPTYPES,JSON.stringify(ops));}catch(e){}}
-  const active=await sbGetSetting('op_active_state');
-  if(active&&typeof active==='object'){try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(active));}catch(e){}}
-  const nissan=await sbGetSetting('nissan_settings');
-  if(nissan&&typeof nissan==='object'){
-    try{localStorage.setItem(LS_NISSAN,JSON.stringify(nissan));}catch(e){}
-    if(nissan.feeLbp) localStorage.setItem('fuel_calc_fee_lbp',nissan.feeLbp);
-  }
-  const fuelPrice=await sbGetSetting('fuel_price');
-  if(fuelPrice) localStorage.setItem('fuel_price_20',fuelPrice);
-  renderOpTypes();
-  renderDefaultOpToggles();
-  refreshAllDropdowns();
-  loadNissanSettings();
+  try{
+    const ops=await sbGetSetting('custom_op_types');
+    if(ops&&Array.isArray(ops)){try{localStorage.setItem(LS_OPTYPES,JSON.stringify(ops));}catch(e){}}
+    const active=await sbGetSetting('op_active_state');
+    if(active&&typeof active==='object'){try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(active));}catch(e){}}
+    const nissan=await sbGetSetting('nissan_settings');
+    if(nissan&&typeof nissan==='object'){
+      try{localStorage.setItem(LS_NISSAN,JSON.stringify(nissan));}catch(e){}
+      if(nissan.feeLbp) localStorage.setItem('fuel_calc_fee_lbp',nissan.feeLbp);
+    }
+  }catch(e){console.warn('loadSettings error',e);}
+  // Load from dedicated Supabase tables
+  if(typeof loadVehiclesFromSupabase==='function') await loadVehiclesFromSupabase();
+  if(typeof loadSvcTypesFromSupabase==='function') await loadSvcTypesFromSupabase();
+  if(typeof loadMaintenanceFromSupabase==='function') await loadMaintenanceFromSupabase();
+  // Refresh UI
+  renderOpTypes&&renderOpTypes();
+  renderDefaultOpToggles&&renderDefaultOpToggles();
+  refreshAllDropdowns&&refreshAllDropdowns();
+  loadNissanSettings&&loadNissanSettings();
+  if(typeof renderVehiclesList==='function'){renderVehiclesList();refreshVehicleDropdowns();}
 }
 function clearCacheReload(){localStorage.removeItem("diesel_tracker_v1");localStorage.removeItem("diesel_tracker_v2");localStorage.removeItem("diesel_tracker_v3");localStorage.removeItem(LS_KEY);toast("Cache cleared — reloading...");setTimeout(()=>location.reload(),800);}
 function clearSetup(){if(!confirm('Disconnect from Supabase? Data already synced stays in DB.'))return;sbUrl='';sbKey='';localStorage.removeItem(CFG_KEY);closeModal('setup-modal');setConnStatus('offline','Not connected');toast('Disconnected');}
@@ -1853,7 +1859,12 @@ if(sbUrl&&sbKey){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
   setConnStatus('loading','Loading from Supabase...');
   renderAll();
-  loadFromSupabase().then(()=>{renderAll();loadSettingsFromSupabase().then(()=>prefillAddEntry());}).catch(e=>setConnStatus('offline','Failed: '+e.message));
+  loadFromSupabase().then(async ()=>{
+    renderAll();
+    await loadSettingsFromSupabase();
+    prefillAddEntry();
+    setTimeout(()=>{if(typeof renderReminders==='function')renderReminders();},600);
+  }).catch(e=>setConnStatus('offline','Failed: '+e.message));
 }else{
   entries=localLoad();
   nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;

@@ -2134,39 +2134,40 @@ function renderVehiclesList(){
   const v=getVehicles();
   const icons={car:'🚗',suv:'🚙',truck:'🚛',motorcycle:'🏍',other:'🚘'};
   if(!v.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">No vehicles yet.</p>';return;}
-  el.innerHTML=v.map(vh=>`
-    <div class="veh-card" id="veh-row-${vh.id}">
-      <span style="font-size:20px">${icons[vh.type]||'🚗'}</span>
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:600">${vh.name}</div>
-        <div style="font-size:11px;color:var(--text3)">${[vh.year,vh.plate,vh.type].filter(Boolean).join(' · ')}</div>
-      </div>
-      <button class="btn btn-sm" style="font-size:11px" onclick="editVehicle('${vh.id}')">✏️ Edit</button>
-      <button class="btn-icon del" onclick="removeVehicle('${vh.id}')">✕</button>
-    </div>
-    <div id="veh-edit-${vh.id}" style="display:none;background:var(--surface2);border-radius:var(--rs);padding:12px;margin-bottom:8px;border:1px solid var(--border)">
-      <div class="form-row" style="margin-bottom:8px">
-        <div class="fg" style="margin-bottom:0"><label>Name</label><input type="text" id="veh-edit-name-${vh.id}" value="${vh.name}"></div>
-        <div class="fg" style="margin-bottom:0"><label>Plate</label><input type="text" id="veh-edit-plate-${vh.id}" value="${vh.plate||''}"></div>
-      </div>
-      <div class="form-row" style="margin-bottom:10px">
-        <div class="fg" style="margin-bottom:0"><label>Year</label><input type="number" id="veh-edit-year-${vh.id}" value="${vh.year||''}"></div>
-        <div class="fg" style="margin-bottom:0"><label>Type</label>
-          <select id="veh-edit-type-${vh.id}">
-            <option value="car" ${vh.type==='car'?'selected':''}>Car 🚗</option>
-            <option value="suv" ${vh.type==='suv'?'selected':''}>SUV 🚙</option>
-            <option value="truck" ${vh.type==='truck'?'selected':''}>Truck 🚛</option>
-            <option value="motorcycle" ${vh.type==='motorcycle'?'selected':''}>Motorcycle 🏍</option>
-            <option value="other" ${vh.type==='other'?'selected':''}>Other 🚘</option>
-          </select>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-p btn-sm" onclick="saveVehicleEdit('${vh.id}')">Save</button>
-        <button class="btn btn-sm" onclick="editVehicle('${vh.id}')">Cancel</button>
-      </div>
-    </div>
-  `).join('');
+  el.innerHTML=v.map(function(vh){
+    const sid=String(vh.id);
+    return '<div class="veh-card" id="veh-row-'+sid+'">'+
+      '<span style="font-size:20px">'+(icons[vh.type]||'🚗')+'</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-size:14px;font-weight:600">'+vh.name+'</div>'+
+        '<div style="font-size:11px;color:var(--text3)">'+(vh.year||'')+(vh.plate?' · '+vh.plate:'')+'</div>'+
+      '</div>'+
+      '<button class="btn btn-sm" style="font-size:11px" data-vid="'+sid+'" onclick="editVehicle(this.dataset.vid)">✏️ Edit</button>'+
+      '<button class="btn-icon del" data-vid="'+sid+'" onclick="removeVehicle(this.dataset.vid)">✕</button>'+
+    '</div>'+
+    '<div id="veh-edit-'+sid+'" style="display:none;background:var(--surface2);border-radius:var(--rs);padding:12px;margin-bottom:8px;border:1px solid var(--border)">'+
+      '<div class="form-row" style="margin-bottom:8px">'+
+        '<div class="fg" style="margin-bottom:0"><label>Name</label><input type="text" id="veh-edit-name-'+sid+'" value="'+vh.name+'"></div>'+
+        '<div class="fg" style="margin-bottom:0"><label>Plate</label><input type="text" id="veh-edit-plate-'+sid+'" value="'+(vh.plate||'')+'"></div>'+
+      '</div>'+
+      '<div class="form-row" style="margin-bottom:10px">'+
+        '<div class="fg" style="margin-bottom:0"><label>Year</label><input type="number" id="veh-edit-year-'+sid+'" value="'+(vh.year||'')+'"></div>'+
+        '<div class="fg" style="margin-bottom:0"><label>Type</label>'+
+          '<select id="veh-edit-type-'+sid+'">'+
+            '<option value="car" '+(vh.type==='car'?'selected':'')+'>Car 🚗</option>'+
+            '<option value="suv" '+(vh.type==='suv'?'selected':'')+'>SUV 🚙</option>'+
+            '<option value="truck" '+(vh.type==='truck'?'selected':'')+'>Truck 🚛</option>'+
+            '<option value="motorcycle" '+(vh.type==='motorcycle'?'selected':'')+'>Motorcycle 🏍</option>'+
+            '<option value="other" '+(vh.type==='other'?'selected':'')+'>Other 🚘</option>'+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-p btn-sm" data-vid="'+sid+'" onclick="saveVehicleEdit(this.dataset.vid)">Save</button>'+
+        '<button class="btn btn-sm" data-vid="'+sid+'" onclick="editVehicle(this.dataset.vid)">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 function editVehicle(id){
   const row=document.getElementById('veh-row-'+id);

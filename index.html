@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- v2.1.3 build 1781709371 -->
+<!-- v2.1.4 build 1781709371 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛽</text></svg>">
-<title>Diesel Tracker v2.1.3</title>
+<title>Diesel Tracker v2.1.4</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 /* ── Reset ── */
@@ -272,12 +272,12 @@ tr:hover td{background:var(--surface2)}
 </head>
 <body>
 
-<div class="version-badge">v2.1.3</div>
+<div class="version-badge">v2.1.4</div>
 <!-- HEADER -->
 <header class="header">
   <div class="header-icon">⛽</div>
   <div class="header-titles">
-    <h1>Diesel Tracker <span class="ver-tag">v2.1.3</span></h1>
+    <h1>Diesel Tracker <span class="ver-tag">v2.1.4</span></h1>
     <p>Voucher management · Nissan · Maintenance</p>
   </div>
   <div class="header-actions">
@@ -748,12 +748,18 @@ tr:hover td{background:var(--surface2)}
         <a href="https://totalenergies.com.lb/en/service-station/fuels/fuel-prices" target="_blank" style="font-size:11px;color:rgba(255,255,255,.6);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:3px 8px;border-radius:4px">TotalEnergies ↗</a>
       </div>
     </div>
-    <button onclick="fcFetchPrice()" id="fetch-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 14px;border-radius:var(--rs);font-size:12px;cursor:pointer;white-space:nowrap">🔄 Refresh</button>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="fcFetchPrice()" id="fetch-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 14px;border-radius:var(--rs);font-size:12px;cursor:pointer;white-space:nowrap">🔄 Fetch price</button>
+      <button onclick="fcRecalc()" style="background:#f5c842;border:none;color:#1a2744;padding:8px 14px;border-radius:var(--rs);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⟳ Build table</button>
+    </div>
   </div>
 
   <!-- Settings -->
   <div class="form-card">
-    <div class="sec-title" style="margin-bottom:10px">Settings</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="sec-title" style="margin-bottom:0">Settings</div>
+      <button onclick="fcRecalc()" class="btn btn-p btn-sm">⟳ Calculate</button>
+    </div>
     <div class="form-row">
       <div class="fg" style="margin-bottom:0">
         <label>Price per 20L صفيحة (LBP)</label>
@@ -762,10 +768,17 @@ tr:hover td{background:var(--surface2)}
       </div>
       <div class="fg" style="margin-bottom:0">
         <label>Cash fee per 20L voucher (LBP)</label>
-        <input type="number" id="fc-fee-lbp" value="115000" step="1000" oninput="fcRecalc();fcSave()">
+        <input type="number" id="fc-fee-lbp" value="115000" step="1000" oninput="fcRecalc();fcSave()" onchange="fcRecalc()">
         <span class="hint">Same as Nissan Settings cash fee</span>
       </div>
     </div>
+  </div>
+
+  <!-- Calculate button -->
+  <div style="margin-bottom:12px">
+    <button onclick="fcRecalc()" class="btn btn-p" style="width:100%;font-size:14px;padding:10px">
+      ⟳ Calculate tables
+    </button>
   </div>
 
   <!-- Two tables side by side -->
@@ -2016,19 +2029,12 @@ function showPage(name,btn){
   if(name==='settings'){renderVehiclesList&&renderVehiclesList();refreshVehicleDropdowns&&refreshVehicleDropdowns();renderOpTypes&&renderOpTypes();renderDefaultOpToggles&&renderDefaultOpToggles();}
   if(name==='nissan') renderNissan&&renderNissan();
   if(name==='fuel'){
-    // Set values first, then recalc
     const fi=document.getElementById('fc-fee-lbp');
     const pi=document.getElementById('fc-price20');
-    if(fi&&!parseFloat(fi.value)){
-      fi.value=localStorage.getItem('diesel_fee_lbp_per20')||(typeof getNissanFeeLbp==='function'?getNissanFeeLbp():115000);
-    }
-    if(pi&&!parseFloat(pi.value)){
-      pi.value=localStorage.getItem('diesel_fuel_price_20')||2350000;
-    }
-    // Run recalc multiple times to ensure it works
-    if(typeof fcRecalc==='function'){fcRecalc();}
-    setTimeout(()=>{if(typeof fcRecalc==='function')fcRecalc();},100);
-    setTimeout(()=>{if(typeof fcInit==='function')fcInit();},200);
+    if(fi&&!parseFloat(fi.value)) fi.value=localStorage.getItem('diesel_fee_lbp_per20')||115000;
+    if(pi&&!parseFloat(pi.value)) pi.value=localStorage.getItem('diesel_fuel_price_20')||2350000;
+    if(typeof fcRecalc==='function') fcRecalc();
+    setTimeout(()=>{if(typeof fcRecalc==='function') fcRecalc();},500);
   }
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
@@ -2128,39 +2134,40 @@ function renderVehiclesList(){
   const v=getVehicles();
   const icons={car:'🚗',suv:'🚙',truck:'🚛',motorcycle:'🏍',other:'🚘'};
   if(!v.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">No vehicles yet.</p>';return;}
-  el.innerHTML=v.map(vh=>`
-    <div class="veh-card" id="veh-row-${vh.id}">
-      <span style="font-size:20px">${icons[vh.type]||'🚗'}</span>
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:600">${vh.name}</div>
-        <div style="font-size:11px;color:var(--text3)">${[vh.year,vh.plate,vh.type].filter(Boolean).join(' · ')}</div>
-      </div>
-      <button class="btn btn-sm" style="font-size:11px" onclick="editVehicle('${vh.id}')">✏️ Edit</button>
-      <button class="btn-icon del" onclick="removeVehicle('${vh.id}')">✕</button>
-    </div>
-    <div id="veh-edit-${vh.id}" style="display:none;background:var(--surface2);border-radius:var(--rs);padding:12px;margin-bottom:8px;border:1px solid var(--border)">
-      <div class="form-row" style="margin-bottom:8px">
-        <div class="fg" style="margin-bottom:0"><label>Name</label><input type="text" id="veh-edit-name-${vh.id}" value="${vh.name}"></div>
-        <div class="fg" style="margin-bottom:0"><label>Plate</label><input type="text" id="veh-edit-plate-${vh.id}" value="${vh.plate||''}"></div>
-      </div>
-      <div class="form-row" style="margin-bottom:10px">
-        <div class="fg" style="margin-bottom:0"><label>Year</label><input type="number" id="veh-edit-year-${vh.id}" value="${vh.year||''}"></div>
-        <div class="fg" style="margin-bottom:0"><label>Type</label>
-          <select id="veh-edit-type-${vh.id}">
-            <option value="car" ${vh.type==='car'?'selected':''}>Car 🚗</option>
-            <option value="suv" ${vh.type==='suv'?'selected':''}>SUV 🚙</option>
-            <option value="truck" ${vh.type==='truck'?'selected':''}>Truck 🚛</option>
-            <option value="motorcycle" ${vh.type==='motorcycle'?'selected':''}>Motorcycle 🏍</option>
-            <option value="other" ${vh.type==='other'?'selected':''}>Other 🚘</option>
-          </select>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-p btn-sm" onclick="saveVehicleEdit('${vh.id}')">Save</button>
-        <button class="btn btn-sm" onclick="editVehicle('${vh.id}')">Cancel</button>
-      </div>
-    </div>
-  `).join('');
+  el.innerHTML=v.map(function(vh){
+    const sid=String(vh.id);
+    return '<div class="veh-card" id="veh-row-'+sid+'">'+
+      '<span style="font-size:20px">'+(icons[vh.type]||'🚗')+'</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-size:14px;font-weight:600">'+vh.name+'</div>'+
+        '<div style="font-size:11px;color:var(--text3)">'+(vh.year||'')+(vh.plate?' · '+vh.plate:'')+'</div>'+
+      '</div>'+
+      '<button class="btn btn-sm" style="font-size:11px" data-vid="'+sid+'" onclick="editVehicle(this.dataset.vid)">✏️ Edit</button>'+
+      '<button class="btn-icon del" data-vid="'+sid+'" onclick="removeVehicle(this.dataset.vid)">✕</button>'+
+    '</div>'+
+    '<div id="veh-edit-'+sid+'" style="display:none;background:var(--surface2);border-radius:var(--rs);padding:12px;margin-bottom:8px;border:1px solid var(--border)">'+
+      '<div class="form-row" style="margin-bottom:8px">'+
+        '<div class="fg" style="margin-bottom:0"><label>Name</label><input type="text" id="veh-edit-name-'+sid+'" value="'+vh.name+'"></div>'+
+        '<div class="fg" style="margin-bottom:0"><label>Plate</label><input type="text" id="veh-edit-plate-'+sid+'" value="'+(vh.plate||'')+'"></div>'+
+      '</div>'+
+      '<div class="form-row" style="margin-bottom:10px">'+
+        '<div class="fg" style="margin-bottom:0"><label>Year</label><input type="number" id="veh-edit-year-'+sid+'" value="'+(vh.year||'')+'"></div>'+
+        '<div class="fg" style="margin-bottom:0"><label>Type</label>'+
+          '<select id="veh-edit-type-'+sid+'">'+
+            '<option value="car" '+(vh.type==='car'?'selected':'')+'>Car 🚗</option>'+
+            '<option value="suv" '+(vh.type==='suv'?'selected':'')+'>SUV 🚙</option>'+
+            '<option value="truck" '+(vh.type==='truck'?'selected':'')+'>Truck 🚛</option>'+
+            '<option value="motorcycle" '+(vh.type==='motorcycle'?'selected':'')+'>Motorcycle 🏍</option>'+
+            '<option value="other" '+(vh.type==='other'?'selected':'')+'>Other 🚘</option>'+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-p btn-sm" data-vid="'+sid+'" onclick="saveVehicleEdit(this.dataset.vid)">Save</button>'+
+        '<button class="btn btn-sm" data-vid="'+sid+'" onclick="editVehicle(this.dataset.vid)">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 function editVehicle(id){
   const row=document.getElementById('veh-row-'+id);
@@ -2182,11 +2189,13 @@ async function saveVehicleEdit(id){
   Object.assign(vh,{name,plate,year,type});
   saveVehicles(v);
   if(sbUrl&&sbKey){
-    try{await sbFetch('vehicles?id=eq.'+id,{method:'PATCH',body:JSON.stringify({name,plate,year,type})});}
+    try{await sbFetch('vehicles?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({name,plate,year,type})});}
     catch(e){console.warn('vehicle update',e);}
   }
   // Update any entries that used old name
   entries.forEach(e=>{if(e.person===oldName)e.person=name;});
+  // Reload from Supabase to get fresh data
+  await loadVehiclesFromSupabase();
   renderVehiclesList();refreshVehicleDropdowns();
   toast('Vehicle updated ✓');
 }

@@ -2301,21 +2301,14 @@ function updateStockMiniBar(){
   if(eld) eld.textContent=(lt10+lt20+lt30)+' L total';
 }
 
-// Hook into renderAll
-const _origRenderAll=renderAll;
-function renderAll(){
-  _origRenderAll();
-  updateStockMiniBar();
-}
-
-// Close add panel after successful add
-const _origAddEntry=addEntry;
-async function addEntry(){
-  const before=entries.length;
-  await _origAddEntry();
-  if(entries.length>before||document.getElementById('add-preview').textContent.includes('✓')){
-    setTimeout(closeAddPanel,300);
+// Close add panel after successful add — hook into toast
+const _origToast=toast;
+function toast(msg){
+  _origToast(msg);
+  if(msg&&msg.includes('Entry added')){
+    setTimeout(closeAddPanel,400);
   }
+  updateStockMiniBar();
 }
 
 </script>

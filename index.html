@@ -2501,20 +2501,29 @@ function openAddPanel(){
   if(form&&panel&&!panel.hasChildNodes()){
     [...form.children].forEach(c=>panel.appendChild(c));
   }
-  // Always reset and prefill fresh
+  const vehs=getVehicles();
+  console.log('DEBUG openAddPanel: vehicles=',JSON.stringify(vehs));
+  // Set type
   const typeEl=document.getElementById('inp-type');
   if(typeEl) typeEl.value='تعبئة';
+  // Update datalist
+  const dl=document.getElementById('persons-datalist');
+  if(dl){
+    dl.innerHTML=vehs.map(v=>'<option value="'+vehLabel(v)+'">').join('');
+    console.log('DEBUG datalist options:',dl.innerHTML);
+  }
+  // Set person
   const personEl=document.getElementById('inp-person');
-  if(personEl) personEl.value='';
-  // Update datalist with current vehicles
-  updatePersonDropdown&&updatePersonDropdown();
-  // Set person to first vehicle
-  const vehs=getVehicles();
-  if(personEl&&vehs.length) personEl.value=vehLabel(vehs[0]);
-  // Show odo section
+  if(personEl){
+    personEl.value=vehs.length?vehLabel(vehs[0]):'';
+    console.log('DEBUG person value set to:',personEl.value);
+  }
+  // Show odo
   const sec=document.getElementById('odo-section');
-  if(sec){sec.classList.add('visible');sec.classList.remove('hidden');}
-  // Full prefill (date, odo, etc)
+  if(sec){
+    sec.classList.add('visible');sec.classList.remove('hidden');
+    console.log('DEBUG odo-section classes:',sec.className);
+  }
   prefillAddEntry();
   syncQuickNissanSettings&&syncQuickNissanSettings();
 }

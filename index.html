@@ -1418,99 +1418,144 @@ function renderStock(){
 function renderNissan(){
   const base=getNissanBase();
   const deductPer20=getNissanDeduct();
-  const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+
+  // Sort ALL Nissan fills by date ascending
+  const fills=entries
+    .filter(e=>e.type==='تعبئة'&&isNissan(e.person))
+    .sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
 
   function effectiveLt(e){
-    if(e.actualLt!=null) return e.actualLt;
+    if(e.actualLt!=null&&e.actualLt>0) return e.actualLt;
     const nom=toLt(e.v10,e.v20,e.v30);
-    return nom-(deductPer20/20)*nom;
+    return nom>0 ? nom-(deductPer20/20)*nom : 0;
   }
 
-  // ── Brim-to-brim efficiency calculation ──
-  // Only calc km/base between consecutive FULL fills that have odometer
-  const fillsWithOdo=fills.filter(e=>e.odometer);
-  const effMap={};   // entry.id → km/base (only for full fills after another full fill)
-  const distMap={};  // entry.id → km distance since last fill (any)
-  const accumMap={}; // entry.id → accumulated liters since last full fill
-
-  // Simple distance map (any fill to next fill)
+  // ── Simple distance map (consecutive fills with odo) ──
+  const fillsWithOdo=fills.filter(e=>e.odometer&&e.odometer>0);
+  const distMap={};
   for(let i=1;i<fillsWithOdo.length;i++){
-    distMap[fillsWithOdo[i].id]=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
+    const dist=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
+    if(dist>0) distMap[fillsWithOdo[i].id]=dist;
   }
 
-  // Brim-to-brim: track accumulated liters between full fills
+  // ── Brim-to-brim: accumulate between consecutive FULL fills ──
+  const effMap={};
+  const accumMap={};
   let accumLt=0;
   let lastFullOdo=null;
-  let lastFullIdx=-1;
-  for(let i=0;i<fillsWithOdo.length;i++){
-    const e=fillsWithOdo[i];
+  let lastFullDate=null;
+
+  for(let i=0;i<fills.length;i++){
+    const e=fills[i];
     const lt=effectiveLt(e);
-    const isFull=e.fullFill!==false; // default true if not set
+    const isFull=e.fullFill!==false;
 
-    if(i===0){
-      // First fill — just set baseline if full
-      if(isFull){ lastFullOdo=e.odometer; lastFullIdx=i; accumLt=0; }
-      else { accumLt+=lt; }
-      accumMap[e.id]=null; // no efficiency for first fill
-      continue;
-    }
-
-    accumLt+=lt;
-
-    if(isFull && lastFullOdo!=null){
-      const dist=e.odometer-lastFullOdo;
-      const eff=accumLt>0&&dist>0?(dist/accumLt*base):null;
-      const effStr=eff&&isFinite(eff)&&eff<2000?eff.toFixed(1):null;
-      if(effStr){
-        effMap[e.id]=effStr;
-        accumMap[e.id]={dist,lt:accumLt.toFixed(1),eff:effStr};
+    if(isFull&&e.odometer){
+      if(lastFullOdo!==null&&accumLt>0){
+        const dist=e.odometer-lastFullOdo;
+        if(dist>0&&accumLt>0){
+          const eff=dist/accumLt*base;
+          if(eff>0&&eff<2000&&isFinite(eff)){
+            const effStr=eff.toFixed(1);
+            effMap[e.id]=effStr;
+            accumMap[e.id]={dist,lt:accumLt.toFixed(1),eff:effStr,fromDate:lastFullDate};
+          }
+        }
       }
-      // reset accumulator
+      // Reset: this full fill starts a new accumulation period
       lastFullOdo=e.odometer;
-      accumLt=0;
-    } else if(isFull){
-      // Full fill but no previous full fill with odo
-      lastFullOdo=e.odometer;
-      accumLt=0;
-      accumMap[e.id]=null;
+      lastFullDate=e.dateStr;
+      accumLt=lt; // include this fill's liters for the NEXT period
     } else {
-      accumMap[e.id]=null; // partial fill — no efficiency
+      // Partial fill or no odo: add liters to accumulator
+      accumLt+=lt;
     }
   }
 
-  // Overall stats (brim-to-brim only)
-  const effVals=Object.values(effMap).map(v=>parseFloat(v)).filter(v=>!isNaN(v)&&isFinite(v)&&v>0&&v<2000);
-  const avgEff=effVals.length?(effVals.reduce((a,b)=>a+b,0)/effVals.length).toFixed(1):0;
-  const totalNomLt=fills.reduce((s,e)=>s+toLt(e.v10,e.v20,e.v30),0);
-  const totalActLt=fills.reduce((s,e)=>s+effectiveLt(e),0);
-  const fullFillsWithOdo=fillsWithOdo.filter(e=>e.fullFill!==false);
+  // ── Overall stats: oldest full → newest full ──
+  const fullFillsWithOdo=fills.filter(e=>e.fullFill!==false&&e.odometer&&e.odometer>0);
+  const effVals=Object.values(effMap).map(v=>parseFloat(v)).filter(v=>v>0&&v<2000&&isFinite(v));
+  const avgEff=effVals.length?(effVals.reduce((a,b)=>a+b,0)/effVals.length).toFixed(1):null;
   const lastOdo=fillsWithOdo.length?fillsWithOdo[fillsWithOdo.length-1].odometer:0;
-  const totalDist=fullFillsWithOdo.length>1?fullFillsWithOdo[fullFillsWithOdo.length-1].odometer-fullFillsWithOdo[0].odometer:0;
+  const totalActLt=fills.reduce((s,e)=>s+effectiveLt(e),0);
+
+  // Total distance & liters between first and last full fill
+  let overallDist=0, overallLt=0, overallEff=null;
+  if(fullFillsWithOdo.length>=2){
+    const firstFull=fullFillsWithOdo[0];
+    const lastFull=fullFillsWithOdo[fullFillsWithOdo.length-1];
+    overallDist=lastFull.odometer-firstFull.odometer;
+    // Sum all liters between first full and last full (inclusive of fills in between, excluding first fill itself)
+    const inBetween=fills.filter(e=>
+      new Date(e.dateStr)>new Date(firstFull.dateStr)||
+      (e.dateStr===firstFull.dateStr&&e.id>firstFull.id)
+    ).filter(e=>
+      new Date(e.dateStr)<new Date(lastFull.dateStr)||
+      (e.dateStr===lastFull.dateStr&&e.id<=lastFull.id)
+    );
+    overallLt=inBetween.reduce((s,e)=>s+effectiveLt(e),0);
+    if(overallLt>0&&overallDist>0){
+      overallEff=(overallDist/overallLt*base).toFixed(1);
+    }
+  }
 
   document.getElementById('nissan-metrics').innerHTML=`
-    <div class="metric green"><div class="metric-label">Total fills</div><div class="metric-val">${fills.length}</div><div class="metric-sub">${fills.filter(e=>e.fullFill!==false).length} full · ${fills.filter(e=>e.fullFill===false).length} partial</div></div>
-    <div class="metric"><div class="metric-label">Last odometer</div><div class="metric-val">${lastOdo?lastOdo.toLocaleString():'—'}</div><div class="metric-sub">km</div></div>
-    <div class="metric accent"><div class="metric-label">Avg km/${base}L</div><div class="metric-val">${avgEff||'—'}</div><div class="metric-sub">brim-to-brim · ${effVals.length} readings</div></div>
-    <div class="metric"><div class="metric-label">Total tracked</div><div class="metric-val">${totalDist?totalDist.toLocaleString():'—'}</div><div class="metric-sub">km · ${totalActLt.toFixed(1)}L actual</div></div>`;
+    <div class="metric g-accent">
+      <div class="metric-lbl">Total fills</div>
+      <div class="metric-val">${fills.length}</div>
+      <div class="metric-sub">${fills.filter(e=>e.fullFill!==false).length} full · ${fills.filter(e=>e.fullFill===false).length} partial</div>
+    </div>
+    <div class="metric">
+      <div class="metric-lbl">Last odometer</div>
+      <div class="metric-val">${lastOdo?lastOdo.toLocaleString():'—'}</div>
+      <div class="metric-sub">km</div>
+    </div>
+    <div class="metric accent">
+      <div class="metric-lbl">Overall km/${base}L</div>
+      <div class="metric-val">${overallEff||'—'}</div>
+      <div class="metric-sub">${overallDist?overallDist.toLocaleString()+' km / '+overallLt.toFixed(0)+'L':''}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-lbl">Avg km/${base}L (per fill)</div>
+      <div class="metric-val">${avgEff||'—'}</div>
+      <div class="metric-sub">${effVals.length} brim-to-brim readings</div>
+    </div>`;
 
   // Date range filter
-  document.getElementById('nissan-range-wrap').innerHTML=`<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
-    <div class="form-group"><label style="font-size:12px;color:var(--text2)">From</label><input type="date" id="nissan-from" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
-    <div class="form-group"><label style="font-size:12px;color:var(--text2)">To</label><input type="date" id="nissan-to" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
-    <button class="btn btn-sm" onclick="clearNissanFilter()">Clear</button>
-    <span id="nissan-range-avg" style="font-size:13px;color:var(--text2);margin-left:4px"></span>
-  </div>`;
+  document.getElementById('nissan-range-wrap').innerHTML=`
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:var(--text2);font-weight:600">From</label>
+        <input type="date" id="nissan-from" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:var(--text2);font-weight:600">To</label>
+        <input type="date" id="nissan-to" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none">
+      </div>
+      <button class="btn btn-sm" onclick="clearNissanFilter()">Clear</button>
+      <span id="nissan-range-avg" style="font-size:13px;color:var(--text2);margin-left:4px;align-self:flex-end"></span>
+    </div>`;
 
-  // Chart — only full fill efficiency
-  const chartFills=fillsWithOdo.filter(e=>effMap[e.id]);
+  // Chart: brim-to-brim efficiency over time
+  const chartFills=fills.filter(e=>effMap[e.id]).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr));
   const lbls=chartFills.map(e=>fmtDate(e.dateStr));
   const vals=chartFills.map(e=>parseFloat(effMap[e.id]));
   destroyChart('nissanChart');
   if(vals.length){
     charts['nissanChart']=new Chart(document.getElementById('nissanChart'),{
       type:'line',
-      data:{labels:lbls,datasets:[{data:vals,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',tension:.3,pointRadius:4,borderWidth:2,fill:true,label:`km/${base}L`}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} km/${base}L`}}},scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{title:{display:true,text:`km per ${base}L`,font:{size:11}},ticks:{font:{size:11}}}}}
+      data:{labels:lbls,datasets:[{
+        data:vals,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',
+        tension:.3,pointRadius:3,borderWidth:2,fill:true,label:`km/${base}L`
+      }]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} km/${base}L`}}},
+        scales:{
+          x:{ticks:{font:{size:10},maxTicksLimit:12}},
+          y:{min:0,title:{display:true,text:`km per ${base}L`,font:{size:11}},ticks:{font:{size:11}}}
+        }
+      }
     });
   }
 
@@ -1548,11 +1593,14 @@ function renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base){
 
   // Range average km/base
   if((fromDate||toDate)&&document.getElementById('nissan-range-avg')){
-    const rangeFills=filtered.filter(e=>accumMap&&accumMap[e.id]);
-    if(rangeFills.length){
-      const avgEff=(rangeFills.reduce((s,e)=>s+parseFloat(accumMap[e.id].eff),0)/rangeFills.length).toFixed(1);
-      const totalD=rangeFills.reduce((s,e)=>s+(accumMap[e.id].dist||0),0);
-      document.getElementById('nissan-range-avg').innerHTML=`<strong>${rangeFills.length} full fills</strong> · avg <strong>${avgEff} km/${base2}L</strong> · ${totalD.toLocaleString()} km total`;
+    // Range stats: oldest full → newest full in range
+    const rangeFull=filtered.filter(e=>e.fullFill!==false&&e.odometer&&e.odometer>0).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr));
+    if(rangeFull.length>=2){
+      const rFirst=rangeFull[0], rLast=rangeFull[rangeFull.length-1];
+      const rDist=rLast.odometer-rFirst.odometer;
+      const rLt=filtered.filter(e=>new Date(e.dateStr)>=new Date(rFirst.dateStr)).reduce((s,e)=>s+(effectiveLt?effectiveLt(e):toLt(e.v10,e.v20,e.v30)),0);
+      const rEff=rLt>0&&rDist>0?(rDist/rLt*base2).toFixed(1):'—';
+      document.getElementById('nissan-range-avg').innerHTML=`<strong>${rangeFull.length} full fills</strong> · <strong>${rEff} km/${base2}L</strong> · ${rDist.toLocaleString()} km / ${rLt.toFixed(0)}L`;
     } else {
       document.getElementById('nissan-range-avg').textContent='No fills with odometer in range';
     }

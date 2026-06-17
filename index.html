@@ -1740,6 +1740,2023 @@ if(sbUrl&&sbKey){
   renderAll();
 }
 
+
+// Hook maintenance into showPage
+const _showPageOrig = showPage;
+function showPage(name, btn){
+  _showPageOrig(name, btn);
+  if(name==='maintenance') renderMaintenancePage();
+}
+// ══════════════════════════════════════════
+// MAINTENANCE MODULE
+// ══════════════════════════════════════════
+const LS_MAINTENANCE = 'diesel_maintenance_v1';
+const LS_SVC_TYPES   = 'diesel_svc_types_v1';
+let maintenanceEntries = [];
+let editingMaintId = null;
+
+// ── Default service types ──
+const DEFAULT_SVC_TYPES = [
+  {id:'oil',    name:'Oil change',       reminder:{type:'both', km:5000, timeVal:3, timeUnit:'months'}},
+  {id:'filter', name:'Oil filter',       reminder:{type:'km',   km:5000}},
+  {id:'air',    name:'Air filter',       reminder:{type:'km',   km:20000}},
+  {id:'tires',  name:'Tire rotation',    reminder:{type:'both', km:10000, timeVal:6, timeUnit:'months'}},
+  {id:'brakes', name:'Brake inspection', reminder:{type:'km',   km:20000}},
+  {id:'spark',  name:'Spark plugs',      reminder:{type:'km',   km:30000}},
+  {id:'belt',   name:'Timing belt',      reminder:{type:'km',   km:60000}},
+  {id:'coolant',name:'Coolant flush',    reminder:{type:'both', km:40000, timeVal:2, timeUnit:'years'}},
+];
+
+function getServiceTypes(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(LS_SVC_TYPES)||'null');
+    if(saved) return saved;
+  }catch(e){}
+  return DEFAULT_SVC_TYPES.map(t=>({...t}));
+}
+function saveServiceTypes(types){
+  try{localStorage.setItem(LS_SVC_TYPES,JSON.stringify(types));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('svc_types',types);
+}
+function loadMaintenanceEntries(){
+  try{const s=localStorage.getItem(LS_MAINTENANCE);if(s)return JSON.parse(s);}catch(e){}
+  return[];
+}
+function saveMaintenanceLocal(){
+  try{localStorage.setItem(LS_MAINTENANCE,JSON.stringify(maintenanceEntries));}catch(e){}
+}
+
+// ── Supabase maintenance ──
+async function loadMaintenanceFromSupabase(){
+  if(!sbUrl||!sbKey)return;
+  try{
+    const data=await sbFetch('maintenance_entries?order=date_str.desc,id.desc&limit=1000');
+    if(data){
+      maintenanceEntries=data.map(r=>({
+        id:r.id, dateStr:r.date_str, odometer:r.odometer,
+        services:r.services||[], costs:r.costs||{}, notes:r.notes||''
+      }));
+      try{localStorage.setItem(LS_MAINTENANCE,JSON.stringify(maintenanceEntries));}catch(e){}
+    }
+  }catch(e){console.warn('maintenance load failed',e);}
+}
+async function sbInsertMaintenance(entry){
+  if(!sbUrl||!sbKey)return entry;
+  const body={date_str:entry.dateStr,odometer:entry.odometer,services:entry.services,costs:entry.costs,notes:entry.notes||null};
+  try{
+    const data=await sbFetch('maintenance_entries',{method:'POST',body:JSON.stringify(body)});
+    if(data&&data[0]) return{...entry,id:data[0].id};
+  }catch(e){console.warn('maint insert failed',e);}
+  return entry;
+}
+async function sbUpdateMaintenance(entry){
+  if(!sbUrl||!sbKey)return;
+  const body={date_str:entry.dateStr,odometer:entry.odometer,services:entry.services,costs:entry.costs,notes:entry.notes||null};
+  try{await sbFetch(`maintenance_entries?id=eq.${entry.id}`,{method:'PATCH',body:JSON.stringify(body)});}catch(e){}
+}
+async function sbDeleteMaintenance(id){
+  if(!sbUrl||!sbKey)return;
+  try{await sbFetch(`maintenance_entries?id=eq.${id}`,{method:'DELETE'});}catch(e){}
+}
+
+// ── Reminder calculation ──
+function getLastService(svcId){
+  for(const e of maintenanceEntries){
+    if(e.services&&e.services.includes(svcId)) return e;
+  }
+  return null;
+}
+function getLastNissanOdoFromEntries(){
+  const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer)
+    .sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+  return fills.length?fills[0].odometer:0;
+}
+function calcReminder(svcType){
+  const last=getLastService(svcType.id);
+  if(!last||!svcType.reminder||svcType.reminder.type==='none') return null;
+  const r=svcType.reminder;
+  const currentOdo=getLastNissanOdoFromEntries();
+  const today=new Date();
+  const lastDate=new Date(last.dateStr);
+  const results=[];
+
+  if((r.type==='km'||r.type==='both')&&last.odometer&&r.km){
+    const nextOdo=last.odometer+r.km;
+    const remaining=nextOdo-currentOdo;
+    results.push({type:'km',next:nextOdo,remaining,overdue:remaining<=0});
+  }
+  if((r.type==='days'||r.type==='months'||r.type==='years'||r.type==='both')&&r.timeVal&&r.timeUnit){
+    const nextDate=new Date(lastDate);
+    if(r.timeUnit==='days') nextDate.setDate(nextDate.getDate()+r.timeVal);
+    else if(r.timeUnit==='months') nextDate.setMonth(nextDate.getMonth()+r.timeVal);
+    else if(r.timeUnit==='years') nextDate.setFullYear(nextDate.getFullYear()+r.timeVal);
+    const daysLeft=Math.round((nextDate-today)/(1000*60*60*24));
+    results.push({type:'time',nextDate,daysLeft,overdue:daysLeft<0});
+  }
+  return results.length?results:null;
+}
+
+// ── Render reminders ──
+function renderMaintenanceReminders(){
+  const types=getServiceTypes();
+  const reminders=[];
+  types.forEach(t=>{
+    const r=calcReminder(t);
+    if(!r) return;
+    r.forEach(ri=>{
+      reminders.push({name:t.name,reminder:ri,overdue:ri.overdue});
+    });
+  });
+  reminders.sort((a,b)=>(a.overdue?-1:1)-(b.overdue?-1:1));
+  const el=document.getElementById('maintenance-reminders');
+  if(!el) return;
+  if(!reminders.length){el.innerHTML='';return;}
+  const overdueList=reminders.filter(r=>r.overdue);
+  const upcomingList=reminders.filter(r=>!r.overdue&&(
+    (r.reminder.type==='km'&&r.reminder.remaining<2000)||
+    (r.reminder.type==='time'&&r.reminder.daysLeft<30)
+  ));
+  let html2='';
+  if(overdueList.length){
+    html2+=`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r);padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:8px">⚠️ Overdue (${overdueList.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${overdueList.map(r=>`<span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500">
+        ${r.name} · ${r.reminder.type==='km'?`${Math.abs(r.reminder.remaining).toLocaleString()}km overdue`:`${Math.abs(r.reminder.daysLeft)}d overdue`}
+      </span>`).join('')}
+      </div></div>`;
+  }
+  if(upcomingList.length){
+    html2+=`<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:var(--r);padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:600;color:#854d0e;margin-bottom:8px">⏰ Due soon (${upcomingList.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${upcomingList.map(r=>`<span style="background:#fef9c3;color:#854d0e;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500">
+        ${r.name} · ${r.reminder.type==='km'?`${r.reminder.remaining.toLocaleString()}km left`:`${r.reminder.daysLeft}d left`}
+      </span>`).join('')}
+      </div></div>`;
+  }
+  el.innerHTML=html2;
+}
+
+// ── Render metrics ──
+function renderMaintenanceMetrics(){
+  const el=document.getElementById('maintenance-metrics');
+  if(!el) return;
+  const total=maintenanceEntries.length;
+  const totalCost=maintenanceEntries.reduce((s,e)=>s+Object.values(e.costs||{}).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
+  const lastEntry=maintenanceEntries[0];
+  const currentOdo=getLastNissanOdoFromEntries();
+  const sinceLastService=lastEntry&&lastEntry.odometer?(currentOdo-lastEntry.odometer):null;
+  el.innerHTML=`
+    <div class="metric"><div class="metric-label">Service visits</div><div class="metric-val">${total}</div></div>
+    <div class="metric"><div class="metric-label">Total spent</div><div class="metric-val" style="font-size:15px">${Math.round(totalCost).toLocaleString()}</div><div class="metric-sub">LBP</div></div>
+    <div class="metric"><div class="metric-label">Last service</div><div class="metric-val" style="font-size:15px">${lastEntry?fmtDate(lastEntry.dateStr):'—'}</div></div>
+    <div class="metric ${sinceLastService>5000?'accent':''}"><div class="metric-label">Since last service</div><div class="metric-val">${sinceLastService!=null?sinceLastService.toLocaleString():'—'}</div><div class="metric-sub">km</div></div>`;
+}
+
+// ── Render service log ──
+function renderMaintenanceLog(){
+  const types=getServiceTypes();
+  const nameMap={};
+  types.forEach(t=>nameMap[t.id]=t.name);
+  const el=document.getElementById('maintenance-body');
+  if(!el) return;
+  if(!maintenanceEntries.length){
+    el.innerHTML='<tr><td colspan="6"><div class="empty-state">No service visits yet.</div></td></tr>';
+    return;
+  }
+  el.innerHTML=maintenanceEntries.map(e=>{
+    const totalCost=Object.values(e.costs||{}).reduce((a,b)=>a+(parseFloat(b)||0),0);
+    const svcNames=(e.services||[]).map(id=>nameMap[id]||id);
+    return`<tr>
+      <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
+      <td class="tr" style="font-weight:600">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:4px">${svcNames.map(n=>`<span style="background:var(--surface2);border:1px solid var(--border);padding:2px 8px;border-radius:20px;font-size:11px;color:var(--text2)">${n}</span>`).join('')}</div></td>
+      <td class="tr" style="font-weight:600">${totalCost?Math.round(totalCost).toLocaleString():''}</td>
+      <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
+      <td><button class="btn-edit" onclick="openMaintenanceEdit(${e.id})">✏️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Render service types settings ──
+function renderServiceTypesList(){
+  const types=getServiceTypes();
+  const el=document.getElementById('service-types-list');
+  if(!el) return;
+  // Update reminder reminder-type visibility
+  const rtSel=document.getElementById('new-svc-reminder-type');
+  if(rtSel) updateSvcReminderVisibility(rtSel.value);
+
+  if(!types.length){el.innerHTML='<p style="font-size:13px;color:var(--text3);margin-bottom:10px">No service types yet.</p>';return;}
+  el.innerHTML=types.map(t=>{
+    const r=t.reminder;
+    let reminderTxt='No reminder';
+    if(r&&r.type!=='none'){
+      const parts=[];
+      if((r.type==='km'||r.type==='both')&&r.km) parts.push(`every ${r.km.toLocaleString()} km`);
+      if((r.type==='days'||r.type==='months'||r.type==='years'||r.type==='both')&&r.timeVal) parts.push(`every ${r.timeVal} ${r.timeUnit}`);
+      reminderTxt=parts.join(' + ');
+    }
+    const last=getLastService(t.id);
+    const rem=calcReminder(t);
+    let statusHtml='';
+    if(rem){
+      rem.forEach(ri=>{
+        if(ri.overdue) statusHtml+=`<span style="color:var(--red);font-size:11px">⚠ Overdue</span> `;
+        else if(ri.type==='km'&&ri.remaining<2000) statusHtml+=`<span style="color:#854d0e;font-size:11px">⏰ ${ri.remaining.toLocaleString()}km left</span> `;
+        else if(ri.type==='time'&&ri.daysLeft<30) statusHtml+=`<span style="color:#854d0e;font-size:11px">⏰ ${ri.daysLeft}d left</span> `;
+      });
+    }
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <span style="font-size:14px;font-weight:500;min-width:140px">${t.name}</span>
+      <span style="font-size:11px;color:var(--text3);flex:1">${reminderTxt}</span>
+      ${statusHtml}
+      ${last?`<span style="font-size:11px;color:var(--text2)">Last: ${fmtDate(last.dateStr)}</span>`:''}
+      <button class="btn-del" onclick="removeServiceType('${t.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function updateSvcReminderVisibility(val){
+  const km=document.getElementById('new-svc-km-wrap');
+  const ti=document.getElementById('new-svc-time-wrap');
+  if(km) km.style.display=(val==='km'||val==='both')?'':'none';
+  if(ti) ti.style.display=(val==='days'||val==='months'||val==='years'||val==='both')?'':'none';
+}
+
+function addServiceType(){
+  const name=document.getElementById('new-svc-name').value.trim();
+  if(!name){alert('Please enter a service name');return;}
+  const rType=document.getElementById('new-svc-reminder-type').value;
+  const reminder={type:rType};
+  if(rType==='km'||rType==='both') reminder.km=parseInt(document.getElementById('new-svc-km').value)||0;
+  if(rType==='days'||rType==='months'||rType==='years'||rType==='both'){
+    reminder.timeVal=parseInt(document.getElementById('new-svc-time-val').value)||0;
+    reminder.timeUnit=document.getElementById('new-svc-time-unit').value;
+  }
+  const types=getServiceTypes();
+  const id='svc_'+Date.now();
+  types.push({id,name,reminder});
+  saveServiceTypes(types);
+  document.getElementById('new-svc-name').value='';
+  renderServiceTypesList();
+  toast('Service type added ✓');
+}
+function removeServiceType(id){
+  if(!confirm('Remove this service type?'))return;
+  const types=getServiceTypes().filter(t=>t.id!==id);
+  saveServiceTypes(types);
+  renderServiceTypesList();
+  toast('Removed');
+}
+
+// ── Panel open/close ──
+let _editingMaintId=null;
+function openMaintenancePanel(){
+  _editingMaintId=null;
+  document.getElementById('maint-panel-title').textContent='New service visit';
+  document.getElementById('maint-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('maint-odo').value=getLastNissanOdoFromEntries()||'';
+  document.getElementById('maint-notes').value='';
+  document.getElementById('maint-delete-btn').style.display='none';
+  buildServiceChecklist([],{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function openMaintenanceEdit(id){
+  const e=maintenanceEntries.find(x=>x.id===id);
+  if(!e) return;
+  _editingMaintId=id;
+  document.getElementById('maint-panel-title').textContent='Edit service visit';
+  document.getElementById('maint-date').value=e.dateStr;
+  document.getElementById('maint-odo').value=e.odometer||'';
+  document.getElementById('maint-notes').value=e.notes||'';
+  document.getElementById('maint-delete-btn').style.display='inline-flex';
+  buildServiceChecklist(e.services||[],e.costs||{});
+  document.getElementById('maintenance-panel-bg').classList.add('open');
+}
+function buildServiceChecklist(selected,costs){
+  const types=getServiceTypes();
+  const checklist=document.getElementById('maint-services-checklist');
+  const costsEl=document.getElementById('maint-costs');
+  if(!checklist) return;
+  checklist.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+    ${types.map(t=>`
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:${selected.includes(t.id)?'#dbeafe':'var(--surface2)'};border:1px solid ${selected.includes(t.id)?'#93c5fd':'var(--border)'};padding:6px 12px;border-radius:20px;font-size:13px;transition:all .15s">
+        <input type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''} style="display:none" onchange="updateServiceCosts()">
+        ${t.name}
+      </label>`).join('')}
+  </div>`;
+  updateServiceCosts(costs);
+}
+function updateServiceCosts(initialCosts){
+  const types=getServiceTypes();
+  const nameMap={};types.forEach(t=>nameMap[t.id]=t.name);
+  const checked=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  // Update label styles
+  document.querySelectorAll('#maint-services-checklist label').forEach(lbl=>{
+    const cb=lbl.querySelector('input');
+    const isChk=cb.checked;
+    lbl.style.background=isChk?'#dbeafe':'var(--surface2)';
+    lbl.style.borderColor=isChk?'#93c5fd':'var(--border)';
+  });
+  const costsEl=document.getElementById('maint-costs');
+  if(!costsEl) return;
+  if(!checked.length){costsEl.innerHTML='';updateTotalCost();return;}
+  costsEl.innerHTML=`<div class="section-title" style="margin-bottom:8px">Cost per service (LBP)</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+    ${checked.map(id=>`
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;flex:1">${nameMap[id]||id}</span>
+        <input type="number" id="cost-${id}" value="${initialCosts&&initialCosts[id]||''}" placeholder="0" min="0" step="1000"
+          style="width:140px;font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"
+          oninput="updateTotalCost()">
+        <span style="font-size:12px;color:var(--text3)">LBP</span>
+      </div>`).join('')}
+    </div>`;
+  updateTotalCost();
+}
+function updateTotalCost(){
+  const inputs=[...document.querySelectorAll('[id^="cost-"]')];
+  const total=inputs.reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+  const el=document.getElementById('maint-total-cost');
+  if(el) el.textContent=Math.round(total).toLocaleString()+' LBP';
+}
+async function saveMaintenanceEntry(){
+  const dateStr=document.getElementById('maint-date').value;
+  const odometer=parseInt(document.getElementById('maint-odo').value)||null;
+  const notes=document.getElementById('maint-notes').value.trim();
+  if(!dateStr){alert('Please select a date');return;}
+  const services=[...document.querySelectorAll('#maint-services-checklist input:checked')].map(i=>i.value);
+  if(!services.length){alert('Please select at least one service');return;}
+  const costs={};
+  services.forEach(id=>{
+    const el=document.getElementById('cost-'+id);
+    if(el&&el.value) costs[id]=parseFloat(el.value)||0;
+  });
+  if(_editingMaintId){
+    const e=maintenanceEntries.find(x=>x.id===_editingMaintId);
+    if(e){e.dateStr=dateStr;e.odometer=odometer;e.services=services;e.costs=costs;e.notes=notes;}
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) await sbUpdateMaintenance(maintenanceEntries.find(x=>x.id===_editingMaintId));
+    toast('Service visit updated ✓');
+  } else {
+    let entry={id:Date.now(),dateStr,odometer,services,costs,notes};
+    maintenanceEntries.unshift(entry);
+    saveMaintenanceLocal();
+    if(sbUrl&&sbKey) entry=await sbInsertMaintenance(entry);
+    toast('Service visit saved ✓');
+  }
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+}
+async function deleteMaintenanceEntry(){
+  if(!confirm('Delete this service visit?'))return;
+  if(sbUrl&&sbKey) await sbDeleteMaintenance(_editingMaintId);
+  maintenanceEntries=maintenanceEntries.filter(e=>e.id!==_editingMaintId);
+  saveMaintenanceLocal();
+  closeModal('maintenance-panel-bg');
+  renderMaintenancePage();
+  toast('Deleted');
+}
+function renderMaintenancePage(){
+  renderMaintenanceReminders();
+  renderMaintenanceMetrics();
+  renderMaintenanceLog();
+  renderServiceTypesList();
+}
+
+
+// Load on init
+maintenanceEntries=loadMaintenanceEntries();
+
+
+// reminder type visibility on new svc form
+document.addEventListener('DOMContentLoaded',()=>{
+  const sel=document.getElementById('new-svc-reminder-type');
+  if(sel){
+    sel.addEventListener('change',()=>updateSvcReminderVisibility(sel.value));
+    updateSvcReminderVisibility(sel.value);
+  }
+});
+
+
+</script>
+<style>
+:root{--bg:#f8f8f6;--surface:#fff;--surface2:#f2f1ee;--border:rgba(0,0,0,.1);--border2:rgba(0,0,0,.2);--text:#1a1a18;--text2:#6b6b66;--text3:#9a9a94;--navy:#1A2744;--gold:#F5C842;--green:#0F6E56;--red:#dc2626;--r:10px;--rs:6px}
+@media(prefers-color-scheme:dark){:root{--bg:#18181a;--surface:#222224;--surface2:#2c2c2e;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);--text:#f0f0ec;--text2:#a0a09a;--text3:#6a6a64}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px}
+.header-icon{width:36px;height:36px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.header h1{font-size:16px;font-weight:600}.header p{font-size:11px;opacity:.6;margin-top:1px}
+.header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.conn-status{font-size:11px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,.15);display:flex;align-items:center;gap:5px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:#aaa}
+.conn-dot.online{background:#4ade80}.conn-dot.offline{background:#f87171}.conn-dot.loading{background:#fbbf24;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 22px;overflow-x:auto}
+.nav-btn{padding:12px 16px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--text2);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.nav-btn.active{color:var(--navy);border-bottom-color:var(--navy);font-weight:600}
+.page{display:none;padding:20px;max-width:1100px;margin:0 auto}.page.active{display:block}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px 15px}
+.metric.accent{border-left:3px solid var(--gold)}
+.metric.green{border-left:3px solid var(--green)}
+.metric-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.metric-val{font-size:22px;font-weight:600}.metric-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.section-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border)}
+td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}tr:hover td{background:var(--surface2)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-car{background:#dbeafe;color:#1e40af}.b-gift{background:#ede9fe;color:#5b21b6}
+.b-sale{background:#dcfce7;color:#166534}.b-recv{background:#ccfbf1;color:#0f5132}
+.b-buy{background:#fef9c3;color:#854d0e}.b-other{background:#f3f4f6;color:#374151}
+@media(prefers-color-scheme:dark){
+.b-car{background:#1e3a5f;color:#93c5fd}.b-gift{background:#2e1d5e;color:#c4b5fd}
+.b-sale{background:#14532d;color:#86efac}.b-recv{background:#064e3b;color:#6ee7b7}
+.b-buy{background:#451a03;color:#fcd34d}.b-other{background:#374151;color:#d1d5db}}
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;font-weight:500;color:var(--text2)}
+input,select{font-size:14px;padding:8px 11px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);width:100%;outline:none}
+input:focus,select:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,39,68,.12)}
+input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
+.v-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.v-wrap{display:flex;flex-direction:column;gap:4px}
+.v-lbl{font-size:12px;font-weight:600;padding:3px 8px;border-radius:5px;display:inline-flex;align-items:center;justify-content:space-between}
+.v-stock{font-size:11px;font-weight:400;opacity:.75}
+.v-warn{border:1.5px solid #f87171!important}
+.btn{padding:8px 18px;border-radius:var(--rs);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text);transition:all .15s}
+.btn:hover{background:var(--surface2)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}.btn-primary:hover{opacity:.88}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:4px}
+.btn-edit{color:#185FA5;border-color:transparent;background:transparent}.btn-edit:hover{background:#dbeafe}
+.btn-del{color:#dc2626;border-color:transparent;background:transparent}.btn-del:hover{background:#fee2e2}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filter-bar input,.filter-bar select{max-width:160px;font-size:13px;padding:7px 10px}
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:22px}
+.stock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.stock-type{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:10px}
+.stock-count{font-size:34px;font-weight:700;line-height:1}.stock-sub{font-size:12px;color:var(--text2);margin-top:3px}
+.t10{background:#fef9c3;color:#854d0e}.t20{background:#dbeafe;color:#1e40af}.t30{background:#ccfbf1;color:#0f5132}.ttank{background:#ede9fe;color:#5b21b6}
+@media(prefers-color-scheme:dark){.t10{background:#451a03;color:#fcd34d}.t20{background:#1e3a5f;color:#93c5fd}.t30{background:#064e3b;color:#6ee7b7}.ttank{background:#2e1d5e;color:#c4b5fd}}
+.chart-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.chart-title{font-size:13px;font-weight:600;margin-bottom:12px}
+.chart-wrap{position:relative;width:100%}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;font-size:12px;color:var(--text2)}
+.legend span{display:flex;align-items:center;gap:4px}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.prog-name{width:110px;font-size:13px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-bar-wrap{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;border-radius:4px;background:#534AB7}
+.prog-val{width:60px;font-size:12px;color:var(--text2);text-align:right}
+#toast{position:fixed;bottom:22px;right:22px;background:var(--navy);color:#fff;padding:11px 17px;border-radius:var(--r);font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
+#toast.show{opacity:1}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--r);padding:22px;width:min(580px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);line-height:1}
+/* Setup modal */
+.setup-box{background:var(--surface2);border-radius:var(--r);padding:16px;margin-bottom:12px;font-size:13px;color:var(--text2);line-height:1.7}
+.setup-box code{background:var(--surface);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;color:var(--text)}
+/* Odometer section */
+.odo-section{background:linear-gradient(135deg,rgba(26,39,68,.06),rgba(15,110,86,.06));border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.odo-section.hidden{display:none}
+.odo-title{font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.odo-last{font-size:12px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.warn-box{background:#fef2f2;border:1px solid #fecaca;border-radius:var(--rs);padding:10px 13px;font-size:13px;color:#991b1b;margin-bottom:10px;display:none}
+@media(prefers-color-scheme:dark){.warn-box{background:#450a0a;border-color:#7f1d1d;color:#fca5a5}}
+.warn-box.show{display:block}
+.empty-state{text-align:center;padding:36px;color:var(--text3);font-size:14px}
+.nissan-badge{display:inline-flex;align-items:center;gap:4px;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+@media(max-width:768px){
+  .page{padding:12px}
+  .metrics{grid-template-columns:1fr 1fr}
+  .stock-grid{grid-template-columns:1fr 1fr}
+  .v-grid{grid-template-columns:1fr}
+  .filter-bar{gap:6px}
+  .filter-bar input,.filter-bar select{max-width:100%!important;font-size:13px}
+  .form-grid{grid-template-columns:1fr}
+  .modes-row{grid-template-columns:1fr}
+  /* Hide less important log columns on mobile */
+  .col-hide-mobile{display:none}
+  /* Nav scrollable */
+  .nav{padding:0 12px}
+  .nav-btn{padding:10px 12px;font-size:12px}
+  /* Header compact */
+  .header{padding:10px 14px;gap:8px}
+  .header h1{font-size:14px}
+  .header-right{gap:6px}
+  .hbtn,.btn[style*="color:#fff"]{font-size:11px;padding:5px 8px}
+  /* Metric cards */
+  .metric-val{font-size:18px}
+  /* Stock grid */
+  .stock-grid{grid-template-columns:1fr 1fr}
+  /* Charts */
+  .chart-wrap canvas{max-height:200px}
+  /* Stats 2-col → 1-col */
+  div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  /* Modal full width */
+  .modal{width:95vw;padding:16px}
+  /* Nissan quick settings wrap */
+  .odo-section div[style*="display:flex;gap:14px"]{flex-direction:column;gap:8px}
+}
+@media(max-width:480px){
+  .metrics{grid-template-columns:1fr}
+  .stock-grid{grid-template-columns:1fr}
+  .header-right .hbtn:not(:last-child){display:none}
+  .nav-btn{padding:10px 8px;font-size:11px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">⛽</div>
+  <div><h1>Diesel Voucher Tracker</h1><p>Track 10L · 20L · 30L vouchers · <span style="color:var(--gold)">v10</span></p></div>
+  <div class="header-right">
+    <div class="conn-status" id="conn-status"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting...</span></div>
+    <button class="btn" style="color:#fff;border-color:rgba(255,255,255,.3);font-size:12px" onclick="openSetup()">⚙ Supabase</button>
+    <a href="fuel-calculator.html" style="color:#fff;border-color:rgba(255,255,255,.3);font-size:12px;padding:8px 14px;border-radius:6px;border:1px solid rgba(255,255,255,.3);text-decoration:none">⛽ Fuel Calc</a> <button class="btn" style="color:#fff;border-color:rgba(255,255,255,.3);font-size:12px" onclick="exportCSV()">⬇ CSV</button>
+  </div>
+</div>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showPage('log',this)">📋 Log</button>
+  <button class="nav-btn" onclick="showPage('add',this)">➕ Add Entry</button>
+  <button class="nav-btn" onclick="showPage('stock',this)">🛡 Stock</button>
+  <button class="nav-btn" onclick="showPage('nissan',this)">🚗 Nissan</button>
+  <button class="nav-btn" onclick="showPage('stats',this)">📊 Stats</button>
+  <button class="nav-btn" onclick="showPage('settings',this)">⚙️ Settings</button>
+  <button class="nav-btn" onclick="showPage('maintenance',this)">🔧 Service</button>
+</nav>
+
+<!-- LOG -->
+<div id="page-log" class="page active">
+  <div class="metrics" id="top-metrics"></div>
+  <div class="filter-bar">
+    <select id="filter-type" onchange="renderLog()">
+      <option value="">All types</option>
+      <option value="تعبئة">Car fill</option>
+      <option value="هدية">Gift</option>
+      <option value="بيع">Sale</option>
+      <option value="بيع مني">Sale (personal)</option>
+      <option value="استلام">Received</option>
+      <option value="شراء">Purchase</option>
+      <option value="تعبئة من السيارة">From car</option>
+    </select>
+    <input type="text" id="filter-person" placeholder="Person / vehicle..." oninput="renderLog()" style="max-width:155px;font-size:13px">
+    <select id="filter-year" onchange="renderLog()"></select>
+    <button class="btn btn-sm" onclick="clearFilters()">Clear</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Type</th><th>Person / Vehicle</th>
+        <th style="text-align:right" class="col-hide-mobile">10L</th><th style="text-align:right" class="col-hide-mobile">20L</th><th style="text-align:right" class="col-hide-mobile">30L</th>
+        <th style="text-align:right">Liters</th><th style="text-align:right">Actual (L)</th><th style="text-align:right">Tanks</th>
+        <th class="col-hide-mobile">Odometer</th><th class="col-hide-mobile">Distance</th><th style="text-align:right">Balance</th><th>Notes</th><th></th>
+      </tr></thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+  <p style="font-size:12px;color:var(--text3);margin-top:7px" id="log-count"></p>
+</div>
+
+<!-- ADD -->
+<div id="page-add" class="page">
+  <div class="warn-box" id="stock-warn"></div>
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:14px">New entry</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Date *</label><input type="date" id="inp-date"></div>
+      <div class="form-group"><label>Type *</label>
+        <select id="inp-type" onchange="onTypeChange()">
+          <option value="تعبئة">Car fill (تعبئة)</option>
+          <option value="استلام">Received (استلام)</option>
+          <option value="هدية">Gift (هدية)</option>
+          <option value="بيع">Sale (بيع)</option>
+          <option value="بيع مني">Sale personal (بيع مني)</option>
+          <option value="شراء">Purchase (شراء)</option>
+          <option value="تعبئة من السيارة">From car (تعبئة من السيارة)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Person / Vehicle</label>
+        <input type="text" id="inp-person" list="persons-list" placeholder="Type or choose..." oninput="onPersonChange()">
+        <datalist id="persons-list"></datalist>
+      </div>
+      <div class="form-group"><label>Notes</label><input type="text" id="inp-notes" placeholder="Optional"></div>
+    </div>
+
+    <!-- Odometer (Nissan only) -->
+    <div class="odo-section hidden" id="odo-section">
+      <div class="odo-title">🚗 Nissan — fill details</div>
+      <div class="form-grid" style="margin-bottom:8px">
+        <div class="form-group"><label>Current odometer (km)</label><input type="number" id="inp-odo" placeholder="e.g. 125430" min="0" step="1" oninput="updateOdoPreview()"></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px"><input type="checkbox" id="inp-full-fill" style="width:15px;height:15px;cursor:pointer" checked><span style="font-size:13px;font-weight:500">🔵 Full fill</span></label><span style="font-size:11px;color:var(--text3);margin-top:2px">Uncheck if partial</span></div>
+        <div class="form-group">
+          <label>Actual liters received</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="inp-actual-lt" placeholder="0" min="0" step="0.5" oninput="onActualLtManual()" style="flex:1">
+            <button type="button" class="btn btn-sm" onclick="resetActualLt()" title="Recalculate from vouchers" style="white-space:nowrap;padding:6px 10px">↺</button>
+          </div>
+          <span style="font-size:11px;margin-top:2px" id="actual-lt-hint"></span>
+        </div>
+      </div>
+      <div class="odo-last" id="odo-preview"></div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--text2);font-weight:600">Quick settings:</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:11px;color:var(--text2)">Mode</label>
+          <select id="quick-nissan-mode" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)" onchange="onQuickNissanChange()">
+            <option value="1">Mode 1 — Liter deduction</option>
+            <option value="2">Mode 2 — Cash fee (LBP)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px" id="quick-deduct-wrap">
+          <label style="font-size:11px;color:var(--text2)">Deduct (L per 20L)</label>
+          <input type="number" id="quick-deduct-lt" value="1" step="0.5" min="0" max="5" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);width:65px" onchange="onQuickNissanChange()">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px" id="quick-fee-wrap">
+          <label style="font-size:11px;color:var(--text2)">Fee per 20L (LBP)</label>
+          <input type="number" id="quick-fee-lbp" value="115000" step="1000" min="0" style="font-size:12px;padding:3px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);width:100px" onchange="onQuickNissanChange()">
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-bottom:8px">Vouchers</div>
+    <div class="v-grid">
+      <div class="v-wrap">
+        <span class="v-lbl t10">10L vouchers <span class="v-stock" id="stock-show-10"></span></span>
+        <input type="number" id="inp-v10" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
+      </div>
+      <div class="v-wrap">
+        <span class="v-lbl t20">20L vouchers <span class="v-stock" id="stock-show-20"></span></span>
+        <input type="number" id="inp-v20" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
+      </div>
+      <div class="v-wrap">
+        <span class="v-lbl t30">30L vouchers <span class="v-stock" id="stock-show-30"></span></span>
+        <input type="number" id="inp-v30" value="0" min="0" step="1" oninput="checkStock();updateVoucherTotal();refreshActualLtHint()">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--rs)">
+      <span style="font-size:12px;color:var(--text2)">Total:</span>
+      <span id="voucher-total-lt" style="font-size:14px;font-weight:600;color:var(--text)">0 L</span>
+      <span style="font-size:12px;color:var(--text3)">·</span>
+      <span id="voucher-total-tanks" style="font-size:14px;font-weight:600;color:var(--green)">0.0 tanks</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn btn-primary" id="add-btn" onclick="addEntry()">Add entry</button>
+      <span id="add-preview" style="font-size:13px;color:var(--text2)"></span>
+    </div>
+  </div>
+  <div class="form-card" style="background:var(--surface2);border-style:dashed">
+    <div class="section-title" style="margin-bottom:6px">Voucher values · 1 tank = 20L</div>
+    <p style="font-size:13px;color:var(--text2);line-height:1.7">
+      <strong>10L = 10 liters</strong> · <strong>20L = 20 liters</strong> · <strong>30L = 30 liters</strong><br>
+      Received / Purchase adds to stock. All other types subtract. You cannot use more vouchers than you have in stock.
+    </p>
+  </div>
+</div>
+
+<!-- STOCK -->
+<div id="page-stock" class="page">
+  <div class="section-title">Current voucher stock</div>
+  <div class="stock-grid" id="stock-grid"></div>
+  <div class="chart-box">
+    <div class="chart-title">Stock history (voucher count)</div>
+    <div class="legend">
+      <span><span class="leg-dot" style="background:#BA7517"></span>10L</span>
+      <span><span class="leg-dot" style="background:#185FA5"></span>20L</span>
+      <span><span class="leg-dot" style="background:#0F6E56"></span>30L</span>
+    </div>
+    <div class="chart-wrap" style="height:250px"><canvas id="stockChart"></canvas></div>
+  </div>
+</div>
+
+<!-- NISSAN -->
+<div id="page-nissan" class="page">
+  <div class="metrics" id="nissan-metrics"></div>
+  <div class="chart-box">
+    <div class="chart-title">🚗 Nissan — km per 20L efficiency</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="nissanChart"></canvas></div>
+  </div>
+  <div class="section-title" style="margin-top:4px">Fill-up history</div>
+  <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:var(--rs);padding:9px 13px;font-size:12px;color:#854d0e;margin-bottom:10px">
+    ⚡ <strong>km/20L is calculated brim-to-brim</strong> — only between two consecutive full fills 🔵. Historical fills are all marked Full by default. Edit any partial fills to 🟡 Partial for accurate readings.
+  </div>
+  <div id="nissan-range-wrap"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Date</th>
+        <th style="text-align:right" class="col-hide-mobile">10L</th><th style="text-align:right" class="col-hide-mobile">20L</th><th style="text-align:right" class="col-hide-mobile">30L</th>
+        <th style="text-align:right">Nominal (L)</th>
+        <th style="text-align:right">Actual (L)</th>
+        <th style="text-align:center">Type</th>
+        <th style="text-align:right">Odometer</th>
+        <th style="text-align:right">Distance</th>
+        <th style="text-align:right">km/20L ⛽→⛽</th>
+        <th>Notes</th><th></th>
+      </tr></thead>
+      <tbody id="nissan-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- STATS -->
+<div id="page-stats" class="page">
+  <div class="metrics" id="stats-metrics"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="chart-box">
+      <div class="chart-title">Usage by type (tanks of 20L)</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="usageChart"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Monthly intake vs usage (tanks)</div>
+      <div class="legend">
+        <span><span class="leg-dot" style="background:#0F6E56"></span>Intake</span>
+        <span><span class="leg-dot" style="background:#185FA5"></span>Usage</span>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="monthlyChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">Top recipients — gifts &amp; sales (tanks)</div>
+    <div id="top-recipients"></div>
+  </div>
+</div>
+
+
+<!-- SETTINGS PAGE -->
+<div id="page-settings" class="page">
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:14px">Operation Types</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Add custom operation types with their coefficient (+1 adds to stock, -1 subtracts).</p>
+    <div id="op-types-list" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="form-group" style="min-width:160px"><label>Arabic name</label><input type="text" id="new-op-name" placeholder="e.g. تبرع"></div>
+      <div class="form-group"><label>Label (EN)</label><input type="text" id="new-op-label" placeholder="e.g. Donation"></div>
+      <div class="form-group"><label>Coefficient</label>
+        <select id="new-op-coeff" style="width:90px">
+          <option value="-1">-1 (use)</option>
+          <option value="1">+1 (add)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="addOpType()">Add type</button>
+    </div>
+  </div>
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:12px">Default operation types — toggle active/inactive</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Inactive types are hidden from the Add Entry dropdown. They still appear in the log.</p>
+    <div id="default-op-toggles"></div>
+  </div>
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:14px">Nissan Settings</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Deduction mode</label>
+        <select id="nissan-mode" onchange="saveNissanSettings()">
+          <option value="1">Mode 1 — Liter deduction</option>
+          <option value="2" selected>Mode 2 — Cash fee (LBP)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Liters deducted per 20L voucher (Mode 1)</label>
+        <input type="number" id="nissan-deduct" value="1" step="0.5" min="0" max="5" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">e.g. 1 → 20L voucher fills 19L actual</span>
+      </div>
+      <div class="form-group">
+        <label>Cash fee per 20L voucher in LBP (Mode 2)</label>
+        <input type="number" id="nissan-fee-lbp" value="115000" step="1000" min="0" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">Station takes this LBP and fills rest in fuel</span>
+      </div>
+      <div class="form-group">
+        <label>km/L base for efficiency (liters)</label>
+        <input type="number" id="nissan-base" value="20" step="1" min="1" oninput="saveNissanSettings()">
+        <span style="font-size:11px;color:var(--text3);margin-top:3px">Default 20 → shows km per 20L</span>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="bulkUpdateActualLt()">🔄 Recalculate actual liters for all Nissan fills</button>
+      <span id="bulk-update-msg" style="font-size:13px;color:var(--text2)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE PAGE -->
+<div id="page-maintenance" class="page">
+
+  <!-- Reminders bar -->
+  <div id="maintenance-reminders" style="margin-bottom:14px"></div>
+
+  <!-- Stats row -->
+  <div class="metrics" id="maintenance-metrics"></div>
+
+  <!-- Add service visit button -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div class="section-title" style="margin-bottom:0">Service history</div>
+    <button class="btn btn-primary btn-sm" onclick="openMaintenancePanel()">+ Add service visit</button>
+  </div>
+
+  <!-- Service log table -->
+  <div class="table-wrap" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+    <table>
+      <thead><tr>
+        <th>Date</th>
+        <th class="tr">Odometer</th>
+        <th>Services done</th>
+        <th class="tr">Total cost (LBP)</th>
+        <th>Notes</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="maintenance-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Service types management -->
+  <div class="form-card">
+    <div class="section-title" style="margin-bottom:12px">Service types & reminders</div>
+    <div id="service-types-list"></div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+      <div class="section-title" style="margin-bottom:10px">Add new service type</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Service name</label><input type="text" id="new-svc-name" placeholder="e.g. Oil change"></div>
+        <div class="form-group"><label>Reminder interval</label>
+          <select id="new-svc-reminder-type">
+            <option value="none">No reminder</option>
+            <option value="km">By odometer (km)</option>
+            <option value="days">By days</option>
+            <option value="months">By months</option>
+            <option value="both">Both km & time</option>
+          </select>
+        </div>
+        <div class="form-group" id="new-svc-km-wrap">
+          <label>Every (km)</label>
+          <input type="number" id="new-svc-km" placeholder="e.g. 5000" min="0" step="500">
+        </div>
+        <div class="form-group" id="new-svc-time-wrap">
+          <label>Every</label>
+          <div style="display:flex;gap:6px">
+            <input type="number" id="new-svc-time-val" placeholder="e.g. 3" min="1" style="flex:1">
+            <select id="new-svc-time-unit" style="width:100px">
+              <option value="days">days</option>
+              <option value="months" selected>months</option>
+              <option value="years">years</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addServiceType()">Add service type</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE PANEL -->
+<div class="modal-bg" id="maintenance-panel-bg">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">
+      <span id="maint-panel-title">New service visit</span>
+      <button class="modal-close" onclick="closeModal('maintenance-panel-bg')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Date *</label><input type="date" id="maint-date"></div>
+      <div class="form-group"><label>Odometer (km) *</label><input type="number" id="maint-odo" placeholder="e.g. 222981" min="0" step="1"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px"><label>Notes</label><input type="text" id="maint-notes" placeholder="Optional — workshop, remarks..."></div>
+
+    <div class="section-title" style="margin-bottom:10px">Services performed</div>
+    <div id="maint-services-checklist" style="margin-bottom:12px"></div>
+
+    <!-- Cost per service -->
+    <div id="maint-costs" style="margin-bottom:12px"></div>
+
+    <div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="color:var(--text2)">Total cost</span>
+      <strong id="maint-total-cost">0 LBP</strong>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="saveMaintenanceEntry()">Save</button>
+      <button class="btn" onclick="closeModal('maintenance-panel-bg')">Cancel</button>
+      <button class="btn btn-sm" style="margin-left:auto;color:var(--red);border-color:transparent" id="maint-delete-btn" onclick="deleteMaintenanceEntry()" style="display:none">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-bg" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">Edit entry <button class="modal-close" onclick="closeModal('edit-modal')">✕</button></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Date *</label><input type="date" id="edit-date"></div>
+      <div class="form-group"><label>Type *</label>
+        <select id="edit-type" onchange="onEditTypeChange()">
+          <option value="تعبئة">Car fill (تعبئة)</option>
+          <option value="استلام">Received (استلام)</option>
+          <option value="هدية">Gift (هدية)</option>
+          <option value="بيع">Sale (بيع)</option>
+          <option value="بيع مني">Sale personal (بيع مني)</option>
+          <option value="شراء">Purchase (شراء)</option>
+          <option value="تعبئة من السيارة">From car (تعبئة من السيارة)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Person / Vehicle</label>
+        <input type="text" id="edit-person" list="persons-list" placeholder="Type or choose..." oninput="onEditPersonChange()">
+      </div>
+      <div class="form-group"><label>Notes</label><input type="text" id="edit-notes"></div>
+    </div>
+    <div class="odo-section hidden" id="edit-odo-section">
+      <div class="odo-title">🚗 Nissan — fill details</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Current odometer (km)</label><input type="number" id="edit-odo" placeholder="e.g. 125430" min="0" step="1"></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px"><input type="checkbox" id="edit-full-fill" style="width:15px;height:15px;cursor:pointer" checked><span style="font-size:13px;font-weight:500">🔵 Full fill</span></label></div>
+        <div class="form-group"><label>Actual liters received</label><input type="number" id="edit-actual-lt" placeholder="e.g. 28.5" min="0" step="0.5"><span style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank to auto-calculate</span></div>
+      </div>
+    </div>
+    <div class="section-title" style="margin-bottom:8px">Vouchers</div>
+    <div class="v-grid">
+      <div class="v-wrap"><span class="v-lbl t10">10L vouchers</span><input type="number" id="edit-v10" value="0" min="0" step="1"></div>
+      <div class="v-wrap"><span class="v-lbl t20">20L vouchers</span><input type="number" id="edit-v20" value="0" min="0" step="1"></div>
+      <div class="v-wrap"><span class="v-lbl t30">30L vouchers</span><input type="number" id="edit-v30" value="0" min="0" step="1"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-primary" onclick="saveEdit()">Save changes</button>
+      <button class="btn" onclick="closeModal('edit-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP MODAL -->
+<div class="modal-bg" id="setup-modal">
+  <div class="modal">
+    <div class="modal-title">⚙ Supabase Setup <button class="modal-close" onclick="closeModal('setup-modal')">✕</button></div>
+    <div class="setup-box">
+      <strong>Step 1</strong> — Go to <a href="https://supabase.com" target="_blank" style="color:var(--navy)">supabase.com</a>, create a free project.<br><br>
+      <strong>Step 2</strong> — In SQL Editor, run:<br>
+      <code style="display:block;margin:8px 0;padding:10px;white-space:pre;overflow-x:auto;font-size:11px">create table diesel_entries (
+  id bigint primary key generated always as identity,
+  date_str text not null,
+  type text not null,
+  person text,
+  v10 int default 0,
+  v20 int default 0,
+  v30 int default 0,
+  odometer int,
+  notes text,
+  created_at timestamptz default now()
+);</code>
+      <strong>Step 3</strong> — Go to <em>Project Settings → API</em> and paste below.
+    </div>
+    <div class="form-group" style="margin-bottom:10px"><label>Project URL</label><input type="text" id="setup-url" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
+    <div class="form-group" style="margin-bottom:14px"><label>Anon Public Key</label><input type="text" id="setup-key" placeholder="eyJ..."></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="saveSetup()">Connect</button>
+      <button class="btn" onclick="closeModal('setup-modal')">Cancel</button>
+      <button class="btn" style="margin-left:auto;color:var(--red)" onclick="clearSetup()">Disconnect</button>
+    </div>
+    <p id="setup-msg" style="margin-top:10px;font-size:13px;color:var(--text2)"></p>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"><div class="section-title" style="margin-bottom:8px">Troubleshooting</div><button class="btn" style="font-size:12px" onclick="clearCacheReload()">🔄 Clear local cache &amp; reload from Supabase</button><p style="font-size:11px;color:var(--text3);margin-top:6px">Use this if the app shows wrong data after connecting to Supabase.</p></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Startup: always wipe stale local data ──
+(function(){
+  ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
+})();
+
+// ── Constants ──
+const COEFF={'استلام':1,'شراء':1,'تعبئة':-1,'هدية':-1,'تعبئة من السيارة':0,'بيع':-1,'بيع مني':-1};
+const NISSAN_PERSON='نيسان';
+const LS_NISSAN='nissan_settings';
+const LS_OP_ACTIVE='op_active_state';
+const DEFAULT_OPS=[
+  {name:'تعبئة',   label:'Car fill',        coeff:-1, active:true},
+  {name:'استلام',  label:'Received',         coeff:1,  active:true},
+  {name:'هدية',    label:'Gift',             coeff:-1, active:true},
+  {name:'بيع',     label:'Sale',             coeff:-1, active:true},
+  {name:'بيع مني', label:'Sale (personal)',  coeff:-1, active:true},
+  {name:'شراء',    label:'Purchase',         coeff:1,  active:true},
+  {name:'تعبئة من السيارة',label:'From car', coeff:0,  active:false},
+];
+function getOpActiveState(){
+  try{return JSON.parse(localStorage.getItem(LS_OP_ACTIVE)||'{}');}catch(e){return {};}
+}
+function isOpActive(name){
+  const state=getOpActiveState();
+  if(state[name]!==undefined) return state[name];
+  // default: تعبئة من السيارة inactive by default
+  const def=DEFAULT_OPS.find(o=>o.name===name);
+  return def?def.active:true;
+}
+function toggleOpActive(name){
+  const state=getOpActiveState();
+  state[name]=!isOpActive(name);
+  try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(state));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('op_active_state',state);
+  renderDefaultOpToggles();
+  refreshAllDropdowns();
+}
+function renderDefaultOpToggles(){
+  const el=document.getElementById('default-op-toggles');
+  if(!el)return;
+  el.innerHTML=DEFAULT_OPS.map(op=>{
+    const active=isOpActive(op.name);
+    return`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;min-width:120px;font-weight:500">${op.name}</span>
+      <span style="font-size:12px;color:var(--text2);flex:1">${op.label} · ${op.coeff>0?'+1 (add)':op.coeff<0?'-1 (use)':'0 (no stock)'}</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <span style="color:${active?'var(--green)':'var(--text3)'}">${active?'Active':'Inactive'}</span>
+        <div onclick="toggleOpActive('${op.name}')" style="width:40px;height:22px;border-radius:11px;background:${active?'var(--green)':'var(--border2)'};cursor:pointer;position:relative;transition:background .2s">
+          <div style="width:18px;height:18px;border-radius:9px;background:#fff;position:absolute;top:2px;left:${active?'20px':'2px'};transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+        </div>
+      </label>
+    </div>`;
+  }).join('');
+}
+const LS_OPTYPES='custom_op_types';
+
+function getNissanDeduct(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.deduct||1;}catch(e){return 1;}}
+function getNissanBase(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.base||20;}catch(e){return 20;}}
+async function bulkUpdateActualLt(){
+  const msg=document.getElementById('bulk-update-msg');
+  if(msg) msg.textContent='Calculating...';
+  const mode=getNissanMode();
+  const deduct=getNissanDeduct();
+  const feeLbp=getNissanFeeLbp();
+  const pricePer20=parseFloat(localStorage.getItem('fuel_price_20')||'2350000');
+  const priceLt=pricePer20/20;
+
+  const nissanFills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person));
+  let updated=0;
+  for(const e of nissanFills){
+    const nomLt=toLt(e.v10,e.v20,e.v30);
+    let actLt;
+    if(mode===1){
+      actLt=nomLt-(deduct/20)*nomLt;
+    } else {
+      const totalFee=feeLbp*(nomLt/20);
+      actLt=Math.max(0,(nomLt*priceLt-totalFee)/priceLt);
+    }
+    actLt=parseFloat(actLt.toFixed(1));
+    e.actualLt=actLt;
+    if(sbUrl&&sbKey){
+      try{await sbFetch(`diesel_entries?id=eq.${e.id}`,{method:'PATCH',body:JSON.stringify({actual_lt:actLt})});}
+      catch(err){console.warn('patch failed',e.id,err);}
+    }
+    updated++;
+  }
+  localSave();
+  // Force reload from Supabase to get fresh data
+  if(sbUrl&&sbKey){
+    await loadFromSupabase();
+  }
+  renderAll();
+  if(msg) msg.textContent=`✓ Updated ${updated} Nissan fill records`;
+  toast(`Updated ${updated} Nissan fills ✓`);
+  setTimeout(()=>{if(msg)msg.textContent='';},4000);
+}
+
+function saveNissanSettings(){
+  const d=parseFloat(document.getElementById('nissan-deduct').value)||1;
+  const b=parseFloat(document.getElementById('nissan-base').value)||20;
+  const m=parseInt(document.getElementById('nissan-mode')?.value||2);
+  const f=parseFloat(document.getElementById('nissan-fee-lbp')?.value||115000);
+  const obj={deduct:d,base:b,mode:m,feeLbp:f};
+  try{localStorage.setItem(LS_NISSAN,JSON.stringify(obj));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('nissan_settings',obj);
+  refreshActualLtHint();
+  renderNissan();
+}
+function getNissanMode(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.mode||2;}catch(e){return 2;}}
+function getNissanFeeLbp(){try{const s=JSON.parse(localStorage.getItem(LS_NISSAN)||'{}');return s.feeLbp||115000;}catch(e){return 115000;}}
+function loadNissanSettings(){
+  const d=getNissanDeduct(),b=getNissanBase(),m=getNissanMode(),f=getNissanFeeLbp();
+  const el1=document.getElementById('nissan-deduct');
+  const el2=document.getElementById('nissan-base');
+  const el3=document.getElementById('nissan-mode');
+  const el4=document.getElementById('nissan-fee-lbp');
+  if(el1)el1.value=d;if(el2)el2.value=b;if(el3)el3.value=m;if(el4)el4.value=f;
+}
+
+// Custom op types
+function getCustomOpTypes(){try{return JSON.parse(localStorage.getItem(LS_OPTYPES)||'[]');}catch(e){return[];}}
+function saveCustomOpTypes(types){
+  try{localStorage.setItem(LS_OPTYPES,JSON.stringify(types));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('custom_op_types',types);
+}
+function addOpType(){
+  const name=document.getElementById('new-op-name').value.trim();
+  const label=document.getElementById('new-op-label').value.trim();
+  const coeff=parseInt(document.getElementById('new-op-coeff').value);
+  if(!name){alert('Please enter a name');return;}
+  const types=getCustomOpTypes();
+  if(types.find(t=>t.name===name)){alert('Type already exists');return;}
+  types.push({name,label:label||name,coeff});
+  saveCustomOpTypes(types);
+  document.getElementById('new-op-name').value='';
+  document.getElementById('new-op-label').value='';
+  renderOpTypes();
+  refreshAllDropdowns();
+  toast('Operation type added ✓');
+}
+function removeOpType(name){
+  const types=getCustomOpTypes().filter(t=>t.name!==name);
+  saveCustomOpTypes(types);
+  renderOpTypes();
+  refreshAllDropdowns();
+  toast('Removed');
+}
+function renderOpTypes(){
+  const types=getCustomOpTypes();
+  const el=document.getElementById('op-types-list');
+  if(!el)return;
+  if(!types.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">No custom types yet.</p>';return;}
+  el.innerHTML=types.map(t=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;font-weight:500;min-width:80px">${t.name}</span>
+      <span style="font-size:13px;color:var(--text2)">${t.label}</span>
+      <span class="badge ${t.coeff>0?'b-recv':'b-sale'}" style="margin-left:auto">${t.coeff>0?'+1 (add)':'-1 (use)'}</span>
+      <button class="btn btn-sm btn-del" onclick="removeOpType('${t.name}')">✕</button>
+    </div>`).join('');
+}
+function refreshAllDropdowns(){
+  const customTypes=getCustomOpTypes();
+  ['inp-type','edit-type'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    const curVal=sel.value;
+    // Rebuild all options respecting active state
+    sel.innerHTML='';
+    DEFAULT_OPS.forEach(op=>{
+      if(!isOpActive(op.name)&&id==='inp-type') return; // hide inactive in add form
+      const o=document.createElement('option');
+      o.value=op.name; o.textContent=`${op.label} (${op.name})`;
+      sel.appendChild(o);
+    });
+    if(customTypes.length){
+      const sep=document.createElement('option');
+      sep.disabled=true; sep.textContent='──────────';
+      sel.appendChild(sep);
+      customTypes.forEach(t=>{
+        const o=document.createElement('option');
+        o.value=t.name; o.textContent=`${t.label} (${t.name})`;
+        o.dataset.custom='1'; sel.appendChild(o);
+      });
+    }
+    // restore value if still available
+    if([...sel.options].find(o=>o.value===curVal)) sel.value=curVal;
+  });
+  // Update COEFF map
+  customTypes.forEach(t=>{COEFF[t.name]=t.coeff;});
+}
+const toLt=(v10,v20,v30)=>(v10||0)*10+(v20||0)*20+(v30||0)*30;
+const fmtDate=d=>new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+const typeLabel=t=>({'تعبئة':'Car fill','هدية':'Gift','بيع':'Sale','استلام':'Received','شراء':'Purchase','بيع مني':'Sale (personal)','تعبئة من السيارة':'From car'}[t]||t);
+const badgeClass=t=>({'تعبئة':'b-car','تعبئة من السيارة':'b-car','هدية':'b-gift','بيع':'b-sale','بيع مني':'b-sale','استلام':'b-recv','شراء':'b-buy'}[t]||'b-other');
+const getSign=t=>COEFF[t]||1;
+const isConsume=t=>getSign(t)===-1;
+const excelToDate=n=>{const d=new Date((n-25569)*86400000);return new Date(d.getTime()+d.getTimezoneOffset()*60000);};
+
+// ── Supabase config ──
+const CFG_KEY='diesel_sb_config';
+let sbUrl='https://vubtcaleouuqktscjiqy.supabase.co', sbKey='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1YnRjYWxlb3V1cWt0c2NqaXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MTk1OTcsImV4cCI6MjA5NzA5NTU5N30.IMmXYM17U9SS5vUlCyEL7iDdYzbV1ZnPdyYN_GuKKDM';
+function loadConfig(){
+  // credentials hardcoded - always connected
+  sbUrl='https://vubtcaleouuqktscjiqy.supabase.co'; sbKey='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1YnRjYWxlb3V1cWt0c2NqaXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MTk1OTcsImV4cCI6MjA5NzA5NTU5N30.IMmXYM17U9SS5vUlCyEL7iDdYzbV1ZnPdyYN_GuKKDM';
+}
+function saveConfig(url,key){sbUrl=url;sbKey=key;localStorage.setItem(CFG_KEY,JSON.stringify({url,key}));}
+
+// ── Supabase settings store ──
+async function sbGetSetting(k){
+  try{const d=await sbFetch(`app_settings?key=eq.${encodeURIComponent(k)}&select=value`);return d&&d[0]?d[0].value:null;}catch(e){return null;}
+}
+async function sbSetSetting(k,v){
+  try{
+    await sbFetch('app_settings',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal','Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+  }catch(e){console.warn('sbSetSetting failed',e);}
+}
+async function loadSettingsFromSupabase(){
+  const ops=await sbGetSetting('custom_op_types');
+  if(ops&&Array.isArray(ops)){try{localStorage.setItem(LS_OPTYPES,JSON.stringify(ops));}catch(e){}}
+  const active=await sbGetSetting('op_active_state');
+  if(active&&typeof active==='object'){try{localStorage.setItem(LS_OP_ACTIVE,JSON.stringify(active));}catch(e){}}
+  const nissan=await sbGetSetting('nissan_settings');
+  if(nissan&&typeof nissan==='object'){
+    try{localStorage.setItem(LS_NISSAN,JSON.stringify(nissan));}catch(e){}
+    if(nissan.feeLbp) localStorage.setItem('fuel_calc_fee_lbp',nissan.feeLbp);
+  }
+  const fuelPrice=await sbGetSetting('fuel_price');
+  if(fuelPrice) localStorage.setItem('fuel_price_20',fuelPrice);
+  renderOpTypes();
+  renderDefaultOpToggles();
+  refreshAllDropdowns();
+  loadNissanSettings();
+}
+function clearCacheReload(){localStorage.removeItem("diesel_tracker_v1");localStorage.removeItem("diesel_tracker_v2");localStorage.removeItem("diesel_tracker_v3");localStorage.removeItem(LS_KEY);toast("Cache cleared — reloading...");setTimeout(()=>location.reload(),800);}
+function clearSetup(){if(!confirm('Disconnect from Supabase? Data already synced stays in DB.'))return;sbUrl='';sbKey='';localStorage.removeItem(CFG_KEY);closeModal('setup-modal');setConnStatus('offline','Not connected');toast('Disconnected');}
+function openSetup(){document.getElementById('setup-url').value=sbUrl;document.getElementById('setup-key').value=sbKey;document.getElementById('setup-msg').textContent='';document.getElementById('setup-modal').classList.add('open');}
+async function saveSetup(){
+  const url=document.getElementById('setup-url').value.trim().replace(/\/$/,'');
+  const key=document.getElementById('setup-key').value.trim();
+  if(!url||!key){alert('Please fill both fields.');return;}
+  document.getElementById('setup-msg').textContent='Testing connection...';
+  try{
+    const r=await fetch(`${url}/rest/v1/diesel_entries?limit=1`,{headers:{'apikey':key,'Authorization':`Bearer ${key}`}});
+    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    saveConfig(url,key);
+    localStorage.removeItem(LS_KEY); // clear stale local data
+    closeModal('setup-modal');
+    setConnStatus('online','Connected');
+    toast('Connected to Supabase ✓');
+    await loadFromSupabase();
+    renderAll();
+  }catch(e){document.getElementById('setup-msg').textContent='❌ Failed: '+e.message;}
+}
+
+// ── Connection status ──
+function setConnStatus(state,text){
+  document.getElementById('conn-dot').className='conn-dot '+state;
+  document.getElementById('conn-text').textContent=text;
+}
+
+// ── Supabase API ──
+async function sbFetch(path,opts={}){
+  if(!sbUrl||!sbKey)return null;
+  const r=await fetch(sbUrl+'/rest/v1/'+path,{
+    headers:{'apikey':sbKey,'Authorization':`Bearer ${sbKey}`,'Content-Type':'application/json','Prefer':'return=representation',...(opts.headers||{})},
+    ...opts
+  });
+  if(!r.ok){const t=await r.text();throw new Error(t);}
+  return r.status===204?null:r.json();
+}
+
+async function loadFromSupabase(){
+  if(!sbUrl||!sbKey)return;
+  setConnStatus('loading','Loading...');
+  try{
+    const data=await sbFetch('diesel_entries?order=date_str.asc,id.asc&limit=5000');
+    if(data){
+      entries=data.map(r=>({id:r.id,dateStr:r.date_str,type:r.type,person:r.person||'',v10:r.v10||0,v20:r.v20||0,v30:r.v30||0,odometer:r.odometer||null,actualLt:r.actual_lt!=null?parseFloat(r.actual_lt):null,fullFill:r.full_fill!==false,notes:r.notes||''}));
+      nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;
+      setConnStatus('online','Connected');
+    }
+  }catch(e){setConnStatus('offline','Error: '+e.message);}
+}
+
+async function sbInsert(entry){
+  if(!sbUrl||!sbKey)return entry;
+  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt!==undefined?entry.actualLt:null,full_fill:entry.fullFill!==undefined?entry.fullFill:true,notes:entry.notes||null};
+  const data=await sbFetch('diesel_entries',{method:'POST',body:JSON.stringify(body)});
+  return data?{...entry,id:data[0].id}:entry;
+}
+
+async function sbUpdate(entry){
+  if(!sbUrl||!sbKey)return;
+  const body={date_str:entry.dateStr,type:entry.type,person:entry.person||null,v10:entry.v10||0,v20:entry.v20||0,v30:entry.v30||0,odometer:entry.odometer||null,actual_lt:entry.actualLt!==undefined?entry.actualLt:null,full_fill:entry.fullFill!==undefined?entry.fullFill:true,notes:entry.notes||null};
+  await sbFetch(`diesel_entries?id=eq.${entry.id}`,{method:'PATCH',body:JSON.stringify(body)});
+}
+
+async function sbDelete(id){
+  if(!sbUrl||!sbKey)return;
+  await sbFetch(`diesel_entries?id=eq.${id}`,{method:'DELETE'});
+}
+
+// ── Local fallback ──
+const LS_KEY='diesel_tracker_v4';
+const SEED=[];
+
+function seedEntries(){return [];}
+function localSave(){try{localStorage.setItem(LS_KEY,JSON.stringify(entries));}catch(e){}}
+function localLoad(){if(sbUrl&&sbKey)return[];try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}return seedEntries();}
+
+loadConfig(); // load sbUrl/sbKey BEFORE deciding what entries to use
+console.log('DEBUG sbUrl:', sbUrl ? 'SET' : 'EMPTY', '| sbKey:', sbKey ? 'SET' : 'EMPTY');
+let entries = (sbUrl && sbKey) ? [] : localLoad();
+console.log('DEBUG entries at startup:', entries.length, 'rows');
+let nextId = entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;
+let editingId = null;
+
+// ── Stock calc ──
+function calcStock(){
+  let s10=0,s20=0,s30=0;
+  entries.forEach(e=>{const sg=getSign(e.type);s10+=sg*(e.v10||0);s20+=sg*(e.v20||0);s30+=sg*(e.v30||0);});
+  return{s10:Math.max(0,s10),s20:Math.max(0,s20),s30:Math.max(0,s30)};
+}
+function calcTotals(){
+  let recv=0,car=0,gift=0,sale=0;
+  entries.forEach(e=>{
+    const lt=toLt(e.v10,e.v20,e.v30);
+    if(e.type==='استلام'||e.type==='شراء')recv+=lt;
+    else if(e.type==='تعبئة')car+=lt;
+    else if(e.type==='هدية')gift+=lt;
+    else if(e.type==='بيع'||e.type==='بيع مني')sale+=lt;
+  });
+  return{recv,car,gift,sale};
+}
+
+// ── Stock guard ──
+function prefillAddEntry(){
+  // Set type to تعبئة and person to نيسان
+  const typeEl=document.getElementById('inp-type');
+  const personEl=document.getElementById('inp-person');
+  if(!typeEl||!personEl) return;
+  typeEl.value='تعبئة';
+  personEl.value=NISSAN_PERSON;
+
+  // Reset vouchers
+  document.getElementById('inp-v10').value=0;
+  document.getElementById('inp-v20').value=0;
+  document.getElementById('inp-v30').value=0;
+  updateVoucherTotal();
+  updateStockLabels();
+
+  // Show odometer section
+  document.getElementById('odo-section').classList.remove('hidden');
+
+  // Calculate suggested odometer
+  const nissanFills=entries
+    .filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer)
+    .sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+
+  if(nissanFills.length===0){updateOdoPreview();return;}
+
+  const lastFill=nissanFills[nissanFills.length-1];
+  const lastOdo=lastFill.odometer;
+  const lastDate=new Date(lastFill.dateStr);
+  const today=new Date();
+  const daysSinceLast=Math.max(1,Math.round((today-lastDate)/(1000*60*60*24)));
+
+  // Calculate avg km/day from history
+  let avgKmDay=0;
+  if(nissanFills.length>=2){
+    const distances=[];
+    for(let i=1;i<nissanFills.length;i++){
+      const dist=nissanFills[i].odometer-nissanFills[i-1].odometer;
+      const days=Math.max(1,Math.round((new Date(nissanFills[i].dateStr)-new Date(nissanFills[i-1].dateStr))/(1000*60*60*24)));
+      if(dist>0) distances.push(dist/days);
+    }
+    if(distances.length) avgKmDay=distances.reduce((a,b)=>a+b,0)/distances.length;
+  }
+
+  const suggestedOdo=avgKmDay>0
+    ? Math.round(lastOdo + avgKmDay*daysSinceLast)
+    : lastOdo;
+
+  document.getElementById('inp-odo').value=suggestedOdo;
+  _actualLtManual=false; // reset to auto mode
+  refreshActualLtHint();
+
+  // Show preview
+  const avgKmFill=avgKmDay>0?Math.round(avgKmDay*daysSinceLast):null;
+  const prev=document.getElementById('odo-preview');
+  if(prev){
+    let txt=`Last fill: <strong>${lastOdo.toLocaleString()} km</strong> on ${fmtDate(lastFill.dateStr)} · <strong>${daysSinceLast} days ago</strong>`;
+    if(avgKmDay>0) txt+=` · avg ${avgKmDay.toFixed(0)} km/day → suggested <strong>+${avgKmFill} km</strong>`;
+    prev.innerHTML=txt;
+  }
+}
+
+function updateVoucherTotal(){
+  const v10=parseInt(document.getElementById('inp-v10').value)||0;
+  const v20=parseInt(document.getElementById('inp-v20').value)||0;
+  const v30=parseInt(document.getElementById('inp-v30').value)||0;
+  const lt=toLt(v10,v20,v30);
+  const tanks=(lt/20).toFixed(1);
+  const elLt=document.getElementById('voucher-total-lt');
+  const elTanks=document.getElementById('voucher-total-tanks');
+  if(elLt) elLt.textContent=lt+' L';
+  if(elTanks) elTanks.textContent=tanks+' tanks';
+}
+function checkStock(){
+  const type=document.getElementById('inp-type').value;
+  if(!isConsume(type)){
+    document.getElementById('stock-warn').classList.remove('show');
+    ['inp-v10','inp-v20','inp-v30'].forEach(id=>document.getElementById(id).classList.remove('v-warn'));
+    return true;
+  }
+  const{s10,s20,s30}=calcStock();
+  const v10=parseInt(document.getElementById('inp-v10').value)||0;
+  const v20=parseInt(document.getElementById('inp-v20').value)||0;
+  const v30=parseInt(document.getElementById('inp-v30').value)||0;
+  const errs=[];
+  document.getElementById('inp-v10').classList.toggle('v-warn',v10>s10);
+  document.getElementById('inp-v20').classList.toggle('v-warn',v20>s20);
+  document.getElementById('inp-v30').classList.toggle('v-warn',v30>s30);
+  if(v10>s10)errs.push(`Only ${s10} × 10L vouchers in stock`);
+  if(v20>s20)errs.push(`Only ${s20} × 20L vouchers in stock`);
+  if(v30>s30)errs.push(`Only ${s30} × 30L vouchers in stock`);
+  const warn=document.getElementById('stock-warn');
+  if(errs.length){warn.textContent='⚠ '+errs.join(' · ');warn.classList.add('show');return false;}
+  warn.classList.remove('show');return true;
+}
+function updateStockLabels(){
+  const{s10,s20,s30}=calcStock();
+  document.getElementById('stock-show-10').textContent=`(${s10} left)`;
+  document.getElementById('stock-show-20').textContent=`(${s20} left)`;
+  document.getElementById('stock-show-30').textContent=`(${s30} left)`;
+}
+
+// ── Odometer ──
+function isNissan(val){return (val||'').trim()===NISSAN_PERSON;}
+function getLastNissanOdo(){
+  const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+  return fills.length?fills[fills.length-1]:null;
+}
+function onPersonChange(){
+  const person=document.getElementById('inp-person').value;
+  const type=document.getElementById('inp-type').value;
+  const sec=document.getElementById('odo-section');
+  if(isNissan(person)&&type==='تعبئة'){
+    // Reset vouchers when Nissan selected
+    document.getElementById('inp-v10').value=0;
+    document.getElementById('inp-v20').value=0;
+    document.getElementById('inp-v30').value=0;
+    sec.classList.remove('hidden');syncQuickNissanSettings();updateOdoPreview();
+  }else{sec.classList.add('hidden');}
+  updateVoucherTotal();
+}
+function onTypeChange(){
+  const t=document.getElementById('inp-type').value;
+  const person=document.getElementById('inp-person');
+  const v10=document.getElementById('inp-v10');
+  const v20=document.getElementById('inp-v20');
+  const v30=document.getElementById('inp-v30');
+
+  if(t==='تعبئة'){
+    // Reset vouchers, leave person blank
+    v10.value=0; v20.value=0; v30.value=0;
+    _actualLtManual=false;
+  } else if(t==='استلام'){
+    // Default monthly allocation: 5×10L, 9×20L, 9×30L
+    if(!person.value||person.value.trim()==='') person.value='الجيش';
+    v10.value=5; v20.value=9; v30.value=9;
+  } else {
+    // Reset vouchers to 0 when switching to other types
+    if(t!=='شراء'){v10.value=0;v20.value=0;v30.value=0;}
+  }
+
+  onPersonChange();
+  updateStockLabels();
+  checkStock();
+  if(t!=='تعبئة') document.getElementById('odo-section').classList.add('hidden');
+}
+function syncQuickNissanSettings(){
+  // Sync quick settings from the main settings
+  const modeEl=document.getElementById('quick-nissan-mode');
+  const deductEl=document.getElementById('quick-deduct-lt');
+  const feeEl=document.getElementById('quick-fee-lbp');
+  if(modeEl) modeEl.value=getNissanMode();
+  if(deductEl) deductEl.value=getNissanDeduct();
+  if(feeEl) feeEl.value=getNissanFeeLbp();
+  updateQuickNissanVisibility();
+}
+function updateQuickNissanVisibility(){
+  const mode=parseInt(document.getElementById('quick-nissan-mode')?.value||2);
+  const d=document.getElementById('quick-deduct-wrap');
+  const f=document.getElementById('quick-fee-wrap');
+  if(d) d.style.display=mode===1?'flex':'none';
+  if(f) f.style.display=mode===2?'flex':'none';
+}
+function onQuickNissanChange(){
+  // Apply quick settings changes to main settings
+  const mode=parseInt(document.getElementById('quick-nissan-mode')?.value||2);
+  const deduct=parseFloat(document.getElementById('quick-deduct-lt')?.value||1);
+  const fee=parseFloat(document.getElementById('quick-fee-lbp')?.value||115000);
+  const base=getNissanBase();
+  const obj={deduct,base,mode,feeLbp:fee};
+  try{localStorage.setItem(LS_NISSAN,JSON.stringify(obj));}catch(e){}
+  if(sbUrl&&sbKey) sbSetSetting('nissan_settings',obj);
+  // Sync back to settings page fields
+  const el1=document.getElementById('nissan-deduct');
+  const el2=document.getElementById('nissan-mode');
+  const el3=document.getElementById('nissan-fee-lbp');
+  if(el1)el1.value=deduct;if(el2)el2.value=mode;if(el3)el3.value=fee;
+  updateQuickNissanVisibility();
+  refreshActualLtHint();
+}
+function calcAutoActualLt(){
+  const v10=parseInt(document.getElementById('inp-v10').value)||0;
+  const v20=parseInt(document.getElementById('inp-v20').value)||0;
+  const v30=parseInt(document.getElementById('inp-v30').value)||0;
+  const nomLt=toLt(v10,v20,v30);
+  // Use quick settings if visible, else fall back to saved settings
+  const quickMode=document.getElementById('quick-nissan-mode');
+  const mode=quickMode?parseInt(quickMode.value):getNissanMode();
+  if(mode===1){
+    const quickDeduct=document.getElementById('quick-deduct-lt');
+    const deduct=quickDeduct?parseFloat(quickDeduct.value)||1:getNissanDeduct();
+    return nomLt-(deduct/20)*nomLt;
+  } else {
+    const quickFee=document.getElementById('quick-fee-lbp');
+    const feePer20=quickFee?parseFloat(quickFee.value)||0:getNissanFeeLbp();
+    const pricePer20=parseFloat(localStorage.getItem('fuel_price_20')||'2350000');
+    const priceLt=pricePer20/20;
+    const totalFee=feePer20*(nomLt/20);
+    return Math.max(0,(nomLt*priceLt-totalFee)/priceLt);
+  }
+}
+let _actualLtManual=false;
+function refreshActualLtHint(){
+  const hint=document.getElementById('actual-lt-hint');
+  const inp=document.getElementById('inp-actual-lt');
+  if(!inp)return;
+  const auto=calcAutoActualLt();
+  const nom=toLt(parseInt(document.getElementById('inp-v10').value)||0,parseInt(document.getElementById('inp-v20').value)||0,parseInt(document.getElementById('inp-v30').value)||0);
+  if(!_actualLtManual){
+    // Always show and set auto value
+    inp.value=auto>0?auto.toFixed(1):'';
+    if(hint){hint.textContent=`Auto-calculated: ${nom}L nominal − ${(nom-auto).toFixed(1)}L deduction`;hint.style.color='var(--green)';}
+  } else {
+    if(hint){hint.textContent=`Manual · click ↺ to recalculate (auto = ${auto.toFixed(1)}L)`;hint.style.color='var(--text3)';}
+  }
+}
+function onActualLtManual(){ _actualLtManual=true; refreshActualLtHint(); updateOdoPreview(); }
+function resetActualLt(){
+  _actualLtManual=false;
+  refreshActualLtHint();
+  updateOdoPreview();
+}
+function updateOdoPreview(){
+  const last=getLastNissanOdo();
+  const cur=parseInt(document.getElementById('inp-odo').value)||0;
+  const prev=document.getElementById('odo-preview');
+  if(last){
+    const dist=cur>last.odometer?cur-last.odometer:null;
+    prev.innerHTML=`Last fill: <strong>${last.odometer.toLocaleString()} km</strong> on ${fmtDate(last.dateStr)}`+(dist?` · Distance: <strong>${dist.toLocaleString()} km</strong>`:'');
+  }else{prev.innerHTML='No previous odometer recorded.';}
+}
+function onEditPersonChange(){
+  const person=document.getElementById('edit-person').value;
+  const type=document.getElementById('edit-type').value;
+  document.getElementById('edit-odo-section').classList.toggle('hidden',!(isNissan(person)&&type==='تعبئة'));
+}
+function onEditTypeChange(){onEditPersonChange();}
+
+// ── Person list ──
+function getPersonList(){const s=new Set();entries.forEach(e=>{if(e.person&&e.person.trim())s.add(e.person.trim());});return[...s].sort((a,b)=>a.localeCompare(b,'ar'));}
+function refreshPersonList(){const dl=document.getElementById('persons-list');if(dl)dl.innerHTML=getPersonList().map(p=>`<option value="${p}">`).join('');}
+
+// ── Toast ──
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+// ── Metrics ──
+function renderMetrics(){
+  const{s10,s20,s30}=calcStock();
+  const{recv,car,gift,sale}=calcTotals();
+  const stockLt=toLt(s10,s20,s30);
+  document.getElementById('top-metrics').innerHTML=`
+    <div class="metric accent"><div class="metric-label">Stock</div><div class="metric-val">${(stockLt/20).toFixed(1)} <span style="font-size:14px;font-weight:400">tanks</span></div><div class="metric-sub">${stockLt} L · ${s10}×10 ${s20}×20 ${s30}×30</div></div>
+    <div class="metric"><div class="metric-label">Total received</div><div class="metric-val">${(recv/20).toFixed(1)}</div><div class="metric-sub">tanks · ${recv} L</div></div>
+    <div class="metric"><div class="metric-label">Car fills</div><div class="metric-val">${(car/20).toFixed(1)}</div><div class="metric-sub">tanks · ${car} L</div></div>
+    <div class="metric"><div class="metric-label">Gifts</div><div class="metric-val">${(gift/20).toFixed(1)}</div><div class="metric-sub">tanks · ${gift} L</div></div>
+    <div class="metric"><div class="metric-label">Sales</div><div class="metric-val">${(sale/20).toFixed(1)}</div><div class="metric-sub">tanks · ${sale} L</div></div>`;
+  const pctCar=recv>0?Math.round(car/recv*100):0,pctGift=recv>0?Math.round(gift/recv*100):0,pctSale=recv>0?Math.round(sale/recv*100):0;
+  document.getElementById('stats-metrics').innerHTML=`
+    <div class="metric"><div class="metric-label">Total entries</div><div class="metric-val">${entries.length}</div></div>
+    <div class="metric"><div class="metric-label">% to car</div><div class="metric-val">${pctCar}%</div><div class="metric-sub">${(car/20).toFixed(1)} tanks</div></div>
+    <div class="metric"><div class="metric-label">% as gifts</div><div class="metric-val">${pctGift}%</div><div class="metric-sub">${(gift/20).toFixed(1)} tanks</div></div>
+    <div class="metric"><div class="metric-label">% sold</div><div class="metric-val">${pctSale}%</div><div class="metric-sub">${(sale/20).toFixed(1)} tanks</div></div>`;
+}
+
+// ── Log ──
+function renderLog(){
+  const ft=document.getElementById('filter-type').value;
+  const fp=document.getElementById('filter-person').value.toLowerCase();
+  const fy=document.getElementById('filter-year').value;
+  let filtered=entries.filter(e=>{
+    if(ft&&e.type!==ft)return false;
+    if(fp&&!(e.person||'').toLowerCase().includes(fp))return false;
+    if(fy&&new Date(e.dateStr).getFullYear().toString()!==fy)return false;
+    return true;
+  }).slice().reverse();
+  const tb=document.getElementById('log-body');
+  if(!filtered.length){tb.innerHTML=`<tr><td colspan="12"><div class="empty-state">No entries match your filters.</div></td></tr>`;return;}
+  // build running balance map (chronological order)
+  const sorted=[...entries].sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+  let rb10=0,rb20=0,rb30=0;
+  const balMap={};
+  sorted.forEach(e=>{
+    const sg=e.type==='تعبئة من السيارة'?0:getSign(e.type);
+    rb10+=sg*(e.v10||0); rb20+=sg*(e.v20||0); rb30+=sg*(e.v30||0);
+    balMap[e.id]=toLt(Math.max(0,rb10),Math.max(0,rb20),Math.max(0,rb30));
+  });
+
+  // build odometer distance map for nissan
+  const nissanFills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+  const distMap={};
+  for(let i=1;i<nissanFills.length;i++){distMap[nissanFills[i].id]=nissanFills[i].odometer-nissanFills[i-1].odometer;}
+  tb.innerHTML=filtered.map(e=>{
+    const lt=toLt(e.v10,e.v20,e.v30);
+    const odoCell=e.odometer?e.odometer.toLocaleString()+' km':'';
+    const distCell=distMap[e.id]!=null?distMap[e.id].toLocaleString()+' km':'';
+    return`<tr>
+      <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
+      <td><span class="badge ${badgeClass(e.type)}">${typeLabel(e.type)}</span></td>
+      <td>${e.person||'—'}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v10||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v20||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v30||''}</td>
+      <td style="text-align:right;font-weight:600">${lt}</td>
+      <td style="text-align:right;font-weight:600;color:var(--green)">${e.actualLt!=null?e.actualLt.toFixed(1)+' L':'—'}</td>
+      <td style="text-align:right;color:var(--text2)">${(lt/20).toFixed(2)}</td>
+      <td style="font-size:12px;color:var(--text2)" class="col-hide-mobile">${odoCell}</td>
+      <td style="font-size:12px;color:var(--green);font-weight:${distCell?'600':'400'}" class="col-hide-mobile">${distCell}</td>
+      <td style="text-align:right;font-weight:600;color:${balMap[e.id]<50?'#dc2626':balMap[e.id]<100?'#BA7517':'var(--green)'}">${balMap[e.id]!=null?balMap[e.id]+' L':''}</td>
+      <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-edit" onclick="openEdit(${e.id})">✏️</button>
+        <button class="btn btn-sm btn-del" onclick="deleteEntry(${e.id})">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('log-count').textContent=`${filtered.length} of ${entries.length} entries`;
+}
+
+function populateYearFilter(){
+  const years=[...new Set(entries.map(e=>new Date(e.dateStr).getFullYear()))].sort((a,b)=>b-a);
+  const sel=document.getElementById('filter-year');
+  sel.innerHTML='<option value="">All years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+}
+function clearFilters(){['filter-type','filter-year'].forEach(id=>document.getElementById(id).value='');document.getElementById('filter-person').value='';renderLog();}
+
+// ── Add ──
+async function addEntry(){
+  if(!checkStock())return;
+  const dateStr=document.getElementById('inp-date').value;
+  const type=document.getElementById('inp-type').value;
+  const person=document.getElementById('inp-person').value.trim();
+  const v10=parseInt(document.getElementById('inp-v10').value)||0;
+  const v20=parseInt(document.getElementById('inp-v20').value)||0;
+  const v30=parseInt(document.getElementById('inp-v30').value)||0;
+  const notes=document.getElementById('inp-notes').value.trim();
+  const odometer=isNissan(person)&&type==='تعبئة'?(parseInt(document.getElementById('inp-odo').value)||null):null;
+  const _altVal=document.getElementById('inp-actual-lt').value;
+  const actualLt=isNissan(person)&&type==='تعبئة'?(_altVal!==''&&!isNaN(parseFloat(_altVal))?parseFloat(_altVal):null):null;
+  const fullFill=isNissan(person)&&type==='تعبئة'?(document.getElementById('inp-full-fill')?.checked!==false):null;
+  if(!dateStr){alert('Please select a date.');return;}
+  if(v10===0&&v20===0&&v30===0){alert('Enter at least one voucher.');return;}
+  let entry={id:nextId++,dateStr,type,person,v10,v20,v30,odometer,actualLt,fullFill,notes};
+  entries.push(entry);
+  localSave();
+  if(sbUrl&&sbKey){
+    try{entry=await sbInsert(entry);entries[entries.length-1]=entry;}catch(e){toast('⚠ Saved locally, sync failed');}
+  }
+  document.getElementById('inp-v10').value=0;document.getElementById('inp-v20').value=0;document.getElementById('inp-v30').value=0;
+  document.getElementById('inp-notes').value='';document.getElementById('inp-person').value='';document.getElementById('inp-odo').value='';
+  document.getElementById('inp-actual-lt').value='';
+  document.getElementById('odo-section').classList.add('hidden');
+  document.getElementById('stock-warn').classList.remove('show');
+  const lt=toLt(v10,v20,v30);
+  document.getElementById('add-preview').textContent=`✓ ${typeLabel(type)} — ${lt} L (${(lt/20).toFixed(2)} tanks)`;
+  setTimeout(()=>document.getElementById('add-preview').textContent='',3000);
+  refreshPersonList();renderAll();toast('Entry added ✓');
+}
+
+// ── Edit ──
+function openEdit(id){
+  const e=entries.find(x=>x.id===id);if(!e)return;
+  editingId=id;
+  document.getElementById('edit-date').value=e.dateStr;
+  document.getElementById('edit-type').value=e.type;
+  document.getElementById('edit-person').value=e.person||'';
+  document.getElementById('edit-v10').value=e.v10||0;
+  document.getElementById('edit-v20').value=e.v20||0;
+  document.getElementById('edit-v30').value=e.v30||0;
+  document.getElementById('edit-odo').value=e.odometer||'';
+  document.getElementById('edit-actual-lt').value=e.actualLt||'';
+  if(document.getElementById('edit-full-fill')) document.getElementById('edit-full-fill').checked=e.fullFill!==false;
+  document.getElementById('edit-notes').value=e.notes||'';
+  document.getElementById('edit-odo-section').classList.toggle('hidden',!(isNissan(e.person)&&e.type==='تعبئة'));
+  document.getElementById('edit-modal').classList.add('open');
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');editingId=null;}
+async function saveEdit(){
+  const e=entries.find(x=>x.id===editingId);if(!e)return;
+  const dateStr=document.getElementById('edit-date').value;
+  if(!dateStr){alert('Please select a date.');return;}
+  e.dateStr=dateStr;e.type=document.getElementById('edit-type').value;
+  e.person=document.getElementById('edit-person').value.trim();
+  e.v10=parseInt(document.getElementById('edit-v10').value)||0;
+  e.v20=parseInt(document.getElementById('edit-v20').value)||0;
+  e.v30=parseInt(document.getElementById('edit-v30').value)||0;
+  e.odometer=isNissan(e.person)&&e.type==='تعبئة'?(parseInt(document.getElementById('edit-odo').value)||null):null;
+  const _ealtVal=document.getElementById('edit-actual-lt').value;
+  e.actualLt=isNissan(e.person)&&e.type==='تعبئة'?(_ealtVal!==''&&!isNaN(parseFloat(_ealtVal))?parseFloat(_ealtVal):null):null;
+  e.fullFill=isNissan(e.person)&&e.type==='تعبئة'?(document.getElementById('edit-full-fill')?.checked!==false):null;
+  e.notes=document.getElementById('edit-notes').value.trim();
+  localSave();
+  if(sbUrl&&sbKey){try{await sbUpdate(e);}catch(err){toast('⚠ Saved locally, sync failed');}}
+  closeModal('edit-modal');refreshPersonList();renderAll();toast('Entry updated ✓');
+}
+async function deleteEntry(id){
+  if(!confirm('Delete this entry?'))return;
+  entries=entries.filter(e=>e.id!==id);
+  localSave();
+  if(sbUrl&&sbKey){try{await sbDelete(id);}catch(err){toast('⚠ Deleted locally, sync failed');}}
+  renderAll();toast('Entry deleted');
+}
+
+// ── Stock page ──
+function renderStock(){
+  const{s10,s20,s30}=calcStock();
+  const totalLt=toLt(s10,s20,s30);
+  document.getElementById('stock-grid').innerHTML=`
+    <div class="stock-card"><span class="stock-type t10">10L vouchers</span><div class="stock-count">${s10}</div><div class="stock-sub">${s10*10} liters · ${(s10*10/20).toFixed(1)} tanks</div></div>
+    <div class="stock-card"><span class="stock-type t20">20L vouchers</span><div class="stock-count">${s20}</div><div class="stock-sub">${s20*20} liters · ${(s20*20/20).toFixed(1)} tanks</div></div>
+    <div class="stock-card"><span class="stock-type t30">30L vouchers</span><div class="stock-count">${s30}</div><div class="stock-sub">${s30*30} liters · ${(s30*30/20).toFixed(1)} tanks</div></div>
+    <div class="stock-card" style="border-color:var(--gold)"><span class="stock-type ttank">Total stock</span><div class="stock-count">${(totalLt/20).toFixed(1)}</div><div class="stock-sub">tanks of 20L · ${totalLt} liters</div></div>`;
+}
+
+// ── Nissan page ──
+function renderNissan(){
+  const base=getNissanBase();
+  const deductPer20=getNissanDeduct();
+  const fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+
+  function effectiveLt(e){
+    if(e.actualLt!=null) return e.actualLt;
+    const nom=toLt(e.v10,e.v20,e.v30);
+    return nom-(deductPer20/20)*nom;
+  }
+
+  // ── Brim-to-brim efficiency calculation ──
+  // Only calc km/base between consecutive FULL fills that have odometer
+  const fillsWithOdo=fills.filter(e=>e.odometer);
+  const effMap={};   // entry.id → km/base (only for full fills after another full fill)
+  const distMap={};  // entry.id → km distance since last fill (any)
+  const accumMap={}; // entry.id → accumulated liters since last full fill
+
+  // Simple distance map (any fill to next fill)
+  for(let i=1;i<fillsWithOdo.length;i++){
+    distMap[fillsWithOdo[i].id]=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
+  }
+
+  // Brim-to-brim: track accumulated liters between full fills
+  let accumLt=0;
+  let lastFullOdo=null;
+  let lastFullIdx=-1;
+  for(let i=0;i<fillsWithOdo.length;i++){
+    const e=fillsWithOdo[i];
+    const lt=effectiveLt(e);
+    const isFull=e.fullFill!==false; // default true if not set
+
+    if(i===0){
+      // First fill — just set baseline if full
+      if(isFull){ lastFullOdo=e.odometer; lastFullIdx=i; accumLt=0; }
+      else { accumLt+=lt; }
+      accumMap[e.id]=null; // no efficiency for first fill
+      continue;
+    }
+
+    accumLt+=lt;
+
+    if(isFull && lastFullOdo!=null){
+      const dist=e.odometer-lastFullOdo;
+      const eff=(dist/accumLt*base).toFixed(1);
+      effMap[e.id]=eff;
+      accumMap[e.id]={dist,lt:accumLt.toFixed(1),eff};
+      // reset accumulator
+      lastFullOdo=e.odometer;
+      accumLt=0;
+    } else if(isFull){
+      // Full fill but no previous full fill with odo
+      lastFullOdo=e.odometer;
+      accumLt=0;
+      accumMap[e.id]=null;
+    } else {
+      accumMap[e.id]=null; // partial fill — no efficiency
+    }
+  }
+
+  // Overall stats (brim-to-brim only)
+  const effVals=Object.values(effMap).map(v=>parseFloat(v)).filter(v=>!isNaN(v));
+  const avgEff=effVals.length?(effVals.reduce((a,b)=>a+b,0)/effVals.length).toFixed(1):0;
+  const totalNomLt=fills.reduce((s,e)=>s+toLt(e.v10,e.v20,e.v30),0);
+  const totalActLt=fills.reduce((s,e)=>s+effectiveLt(e),0);
+  const fullFillsWithOdo=fillsWithOdo.filter(e=>e.fullFill!==false);
+  const lastOdo=fillsWithOdo.length?fillsWithOdo[fillsWithOdo.length-1].odometer:0;
+  const totalDist=fullFillsWithOdo.length>1?fullFillsWithOdo[fullFillsWithOdo.length-1].odometer-fullFillsWithOdo[0].odometer:0;
+
+  document.getElementById('nissan-metrics').innerHTML=`
+    <div class="metric green"><div class="metric-label">Total fills</div><div class="metric-val">${fills.length}</div><div class="metric-sub">${fills.filter(e=>e.fullFill!==false).length} full · ${fills.filter(e=>e.fullFill===false).length} partial</div></div>
+    <div class="metric"><div class="metric-label">Last odometer</div><div class="metric-val">${lastOdo?lastOdo.toLocaleString():'—'}</div><div class="metric-sub">km</div></div>
+    <div class="metric accent"><div class="metric-label">Avg km/${base}L</div><div class="metric-val">${avgEff||'—'}</div><div class="metric-sub">brim-to-brim · ${effVals.length} readings</div></div>
+    <div class="metric"><div class="metric-label">Total tracked</div><div class="metric-val">${totalDist?totalDist.toLocaleString():'—'}</div><div class="metric-sub">km · ${totalActLt.toFixed(1)}L actual</div></div>`;
+
+  // Date range filter
+  document.getElementById('nissan-range-wrap').innerHTML=`<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+    <div class="form-group"><label style="font-size:12px;color:var(--text2)">From</label><input type="date" id="nissan-from" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
+    <div class="form-group"><label style="font-size:12px;color:var(--text2)">To</label><input type="date" id="nissan-to" onchange="renderNissanFiltered()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);color:var(--text);outline:none"></div>
+    <button class="btn btn-sm" onclick="clearNissanFilter()">Clear</button>
+    <span id="nissan-range-avg" style="font-size:13px;color:var(--text2);margin-left:4px"></span>
+  </div>`;
+
+  // Chart — only full fill efficiency
+  const chartFills=fillsWithOdo.filter(e=>effMap[e.id]);
+  const lbls=chartFills.map(e=>fmtDate(e.dateStr));
+  const vals=chartFills.map(e=>parseFloat(effMap[e.id]));
+  destroyChart('nissanChart');
+  if(vals.length){
+    charts['nissanChart']=new Chart(document.getElementById('nissanChart'),{
+      type:'line',
+      data:{labels:lbls,datasets:[{data:vals,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',tension:.3,pointRadius:4,borderWidth:2,fill:true,label:`km/${base}L`}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} km/${base}L`}}},scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{title:{display:true,text:`km per ${base}L`,font:{size:11}},ticks:{font:{size:11}}}}}
+    });
+  }
+
+  renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base);
+}
+
+
+function renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base){
+  const base2=base||getNissanBase();
+  const deductPer20=getNissanDeduct();
+  function effLt(e){if(e.actualLt)return e.actualLt;const nom=toLt(e.v10,e.v20,e.v30);return nom-(deductPer20/20)*nom;}
+
+  // Get fills if not passed
+  if(!fills) fills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)||a.id-b.id);
+  if(!distMap){
+    const fillsWithOdo=fills.filter(e=>e.odometer);
+    distMap={}; effMap={};
+    for(let i=1;i<fillsWithOdo.length;i++){
+      const dist=fillsWithOdo[i].odometer-fillsWithOdo[i-1].odometer;
+      distMap[fillsWithOdo[i].id]=dist;
+      const actLt=effLt(fillsWithOdo[i]);
+      effMap[fillsWithOdo[i].id]=actLt>0?(dist/actLt*base2).toFixed(1):'—';
+    }
+    if(!effectiveLt) effectiveLt=effLt;
+  }
+
+  const fromEl=document.getElementById('nissan-from');
+  const toEl=document.getElementById('nissan-to');
+  const fromDate=fromEl&&fromEl.value?new Date(fromEl.value):null;
+  const toDate=toEl&&toEl.value?new Date(toEl.value):null;
+
+  let filtered=fills.slice().reverse();
+  if(fromDate) filtered=filtered.filter(e=>new Date(e.dateStr)>=fromDate);
+  if(toDate) filtered=filtered.filter(e=>new Date(e.dateStr)<=toDate);
+
+  // Range average km/base
+  if((fromDate||toDate)&&document.getElementById('nissan-range-avg')){
+    const rangeFills=filtered.filter(e=>accumMap&&accumMap[e.id]);
+    if(rangeFills.length){
+      const avgEff=(rangeFills.reduce((s,e)=>s+parseFloat(accumMap[e.id].eff),0)/rangeFills.length).toFixed(1);
+      const totalD=rangeFills.reduce((s,e)=>s+(accumMap[e.id].dist||0),0);
+      document.getElementById('nissan-range-avg').innerHTML=`<strong>${rangeFills.length} full fills</strong> · avg <strong>${avgEff} km/${base2}L</strong> · ${totalD.toLocaleString()} km total`;
+    } else {
+      document.getElementById('nissan-range-avg').textContent='No fills with odometer in range';
+    }
+  } else if(document.getElementById('nissan-range-avg')){
+    document.getElementById('nissan-range-avg').textContent='';
+  }
+
+  document.getElementById('nissan-body').innerHTML=filtered.map(e=>{
+    const nom=toLt(e.v10,e.v20,e.v30);
+    const act=effectiveLt(e);
+    const isFull=e.fullFill!==false;
+    const accum=accumMap?accumMap[e.id]:null;
+    return`<tr>
+      <td style="white-space:nowrap;font-size:12px">${fmtDate(e.dateStr)}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v10||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v20||''}</td>
+      <td style="text-align:right;color:var(--text3)" class="col-hide-mobile">${e.v30||''}</td>
+      <td style="text-align:right;font-weight:600">${nom}</td>
+      <td style="text-align:right;color:var(--green);font-weight:600">${act.toFixed(1)}</td>
+      <td style="text-align:center"><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:${isFull?'#dbeafe':'#fef9c3'};color:${isFull?'#1e40af':'#854d0e'};font-weight:500">${isFull?'🔵 Full':'🟡 Partial'}</span></td>
+      <td style="text-align:right">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
+      <td style="text-align:right;color:var(--green);font-weight:${distMap[e.id]?'600':'400'}">${distMap[e.id]?distMap[e.id].toLocaleString()+' km':'—'}</td>
+      <td style="text-align:right;color:var(--navy);font-weight:600">${accum?accum.eff+' <small style="color:var(--text3)">('+accum.lt+'L / '+accum.dist.toLocaleString()+'km)</small>':'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${e.notes||''}</td>
+      <td><button class="btn btn-sm btn-edit" onclick="openEdit(${e.id})">✏️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function clearNissanFilter(){
+  const f=document.getElementById('nissan-from'),t=document.getElementById('nissan-to');
+  if(f)f.value='';if(t)t.value='';
+  renderNissanFiltered();
+}
+
+
+// ── Charts ──
+const charts={};
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function renderStockChart(){
+  const monthly={};let r10=0,r20=0,r30=0;
+  [...entries].sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)).forEach(e=>{
+    const sg=getSign(e.type);r10+=sg*(e.v10||0);r20+=sg*(e.v20||0);r30+=sg*(e.v30||0);
+    const d=new Date(e.dateStr);const key=d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+    monthly[key]={r10:Math.max(0,r10),r20:Math.max(0,r20),r30:Math.max(0,r30)};
+  });
+  const keys=Object.keys(monthly).sort();
+  const lbls=keys.map(k=>{const[y,m]=k.split('-');return new Date(y,m-1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'});});
+  destroyChart('stockChart');
+  charts['stockChart']=new Chart(document.getElementById('stockChart'),{type:'line',data:{labels:lbls,datasets:[
+    {label:'10L',data:keys.map(k=>monthly[k].r10),borderColor:'#BA7517',backgroundColor:'rgba(186,117,23,.08)',tension:.3,pointRadius:0,borderWidth:2},
+    {label:'20L',data:keys.map(k=>monthly[k].r20),borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',tension:.3,pointRadius:0,borderWidth:2},
+    {label:'30L',data:keys.map(k=>monthly[k].r30),borderColor:'#0F6E56',backgroundColor:'rgba(15,110,86,.08)',tension:.3,pointRadius:0,borderWidth:2},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:14,font:{size:11}}},y:{ticks:{font:{size:11}}}}}});
+}
+function renderUsageChart(){
+  const cats={'تعبئة':0,'تعبئة من السيارة':0,'بيع':0,'بيع مني':0,'هدية':0,'شراء':0,'استلام':0};
+  entries.forEach(e=>{if(cats[e.type]!==undefined)cats[e.type]+=toLt(e.v10,e.v20,e.v30);});
+  const labels=['Car fill','From car','Sale','Sale pers.','Gift','Purchase','Received'];
+  const data=[cats['تعبئة'],cats['تعبئة من السيارة'],cats['بيع'],cats['بيع مني'],cats['هدية'],cats['شراء'],cats['استلام']].map(v=>+(v/20).toFixed(1));
+  destroyChart('usageChart');
+  charts['usageChart']=new Chart(document.getElementById('usageChart'),{type:'bar',data:{labels,datasets:[{data,backgroundColor:['#185FA5','#378ADD','#3B6D11','#639922','#534AB7','#BA7517','#0F6E56'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:11}},title:{display:true,text:'Tanks (20L)',font:{size:11}}}}}});
+}
+function renderMonthlyChart(){
+  const monthly={};
+  entries.forEach(e=>{
+    const d=new Date(e.dateStr);const key=d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+    if(!monthly[key])monthly[key]={in:0,out:0};
+    const lt=toLt(e.v10,e.v20,e.v30);
+    if(e.type==='استلام'||e.type==='شراء')monthly[key].in+=lt;else monthly[key].out+=lt;
+  });
+  const keys=Object.keys(monthly).sort().slice(-24);
+  const lbls=keys.map(k=>{const[y,m]=k.split('-');return new Date(y,m-1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'});});
+  destroyChart('monthlyChart');
+  charts['monthlyChart']=new Chart(document.getElementById('monthlyChart'),{type:'bar',data:{labels:lbls,datasets:[
+    {label:'Intake',data:keys.map(k=>+((monthly[k]?.in||0)/20).toFixed(1)),backgroundColor:'#0F6E56',borderRadius:3},
+    {label:'Usage',data:keys.map(k=>+((monthly[k]?.out||0)/20).toFixed(1)),backgroundColor:'#185FA5',borderRadius:3},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{ticks:{font:{size:11}},title:{display:true,text:'Tanks (20L)',font:{size:11}}}}}});
+}
+function renderTopRecipients(){
+  const map={};
+  entries.filter(e=>e.type==='هدية'||e.type==='بيع'||e.type==='بيع مني').forEach(e=>{const n=e.person||'Unknown';map[n]=(map[n]||0)+toLt(e.v10,e.v20,e.v30);});
+  const sorted=Object.entries(map).filter(([n])=>n&&n!=='Unknown').sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const max=sorted[0]?.[1]||1;
+  document.getElementById('top-recipients').innerHTML=sorted.map(([name,lt])=>`
+    <div class="prog-row">
+      <div class="prog-name" title="${name}">${name}</div>
+      <div class="prog-bar-wrap"><div class="prog-fill" style="width:${Math.round(lt/max*100)}%"></div></div>
+      <div class="prog-val">${(lt/20).toFixed(1)} tanks</div>
+    </div>`).join('');
+}
+
+function exportCSV(){
+  const nissanFills=entries.filter(e=>e.type==='تعبئة'&&isNissan(e.person)&&e.odometer).sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr));
+  const distMap={};for(let i=1;i<nissanFills.length;i++)distMap[nissanFills[i].id]=nissanFills[i].odometer-nissanFills[i-1].odometer;
+  const header='Date,Type,Type EN,Person,10L,20L,30L,Liters,Tanks,Odometer,Distance km,Notes';
+  const rows=[...entries].sort((a,b)=>new Date(a.dateStr)-new Date(b.dateStr)).map(e=>{
+    const lt=toLt(e.v10,e.v20,e.v30);
+    return[e.dateStr,e.type,typeLabel(e.type),e.person||'',e.v10||0,e.v20||0,e.v30||0,lt,(lt/20).toFixed(2),e.odometer||'',distMap[e.id]||'',e.notes||''].join(',');
+  });
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent([header,...rows].join('\n'));a.download='diesel-vouchers.csv';a.click();toast('CSV exported ✓');
+}
+
+function renderAll(){
+  renderMetrics();renderLog();renderStock();renderNissan();
+  renderStockChart();renderUsageChart();renderTopRecipients();renderMonthlyChart();
+  refreshPersonList();updateStockLabels();populateYearFilter();
+}
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  if(name==='add') prefillAddEntry();
+}
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
+
+// ── Init ──
+document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+updateVoucherTotal();
+loadNissanSettings();
+renderOpTypes();
+renderDefaultOpToggles();
+refreshAllDropdowns();
+if(sbUrl&&sbKey){
+  // Supabase configured: always start with empty entries, load from DB only
+  entries=[];
+  nextId=1;
+  ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
+  setConnStatus('loading','Loading from Supabase...');
+  renderAll();
+  loadFromSupabase().then(()=>{renderAll();loadSettingsFromSupabase().then(()=>prefillAddEntry());}).catch(e=>setConnStatus('offline','Failed: '+e.message));
+}else{
+  entries=localLoad();
+  nextId=entries.reduce((m,e)=>Math.max(m,+e.id),0)+1;
+  setConnStatus('offline','Local only — click ⚙ Supabase to connect');
+  renderAll();
+}
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>

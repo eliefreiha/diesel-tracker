@@ -1294,9 +1294,11 @@ function prefillAddEntry(){
   const personEl=document.getElementById('inp-person');
   if(!typeEl||!personEl) return;
   typeEl.value='تعبئة';
-  // Set to first vehicle or Nissan
+  // Set to first vehicle
   const vehs=getVehicles();
-  personEl.value=vehs.length?vehs[0].name:NISSAN_PERSON;
+  updatePersonDropdown&&updatePersonDropdown();
+  if(vehs.length) personEl.value=vehs[0].name;
+  else personEl.value=NISSAN_PERSON;
 
   // Reset vouchers
   document.getElementById('inp-v10').value=0;
@@ -1423,9 +1425,14 @@ function onTypeChange(){
   const v30=document.getElementById('inp-v30');
 
   if(t==='تعبئة'){
-    // Reset vouchers, leave person blank
     v10.value=0; v20.value=0; v30.value=0;
     _actualLtManual=false;
+    updatePersonDropdown&&updatePersonDropdown();
+    // Auto-select first vehicle
+    const pp=document.getElementById('inp-person');
+    if(pp&&!pp.value&&getVehicles().length) pp.value=getVehicles()[0].name;
+  } else {
+    updatePersonDropdown&&updatePersonDropdown();
   } else if(t==='استلام'){
     // Default monthly allocation: 5×10L, 9×20L, 9×30L
     if(!person.value||person.value.trim()==='') person.value='الجيش';
@@ -2120,33 +2127,124 @@ async function removeVehicle(id){
 }
 function renderVehiclesList(){
   const el=document.getElementById('vehicles-list');if(!el)return;
-  const v=getVehicles();const icons={car:'🚗',suv:'🚙',truck:'🚛',motorcycle:'🏍',other:'🚘'};
-  el.innerHTML=v.length?v.map(vh=>'<div class="veh-card"><span style="font-size:20px">'+( icons[vh.type]||'🚗')+'</span><div style="flex:1"><div style="font-size:14px;font-weight:600">'+vh.name+'</div><div style="font-size:11px;color:var(--text3)">'+[vh.year,vh.plate].filter(Boolean).join(' · ')+'</div></div><button class="btn-icon del" onclick="removeVehicle('+JSON.stringify(vh.id)+')">✕</button></div>').join(''):'<p style="font-size:13px;color:var(--text3)">No vehicles yet.</p>';
+  const v=getVehicles();
+  const icons={car:'🚗',suv:'🚙',truck:'🚛',motorcycle:'🏍',other:'🚘'};
+  if(!v.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">No vehicles yet.</p>';return;}
+  el.innerHTML=v.map(vh=>`
+    <div class="veh-card" id="veh-row-${vh.id}">
+      <span style="font-size:20px">${icons[vh.type]||'🚗'}</span>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">${vh.name}</div>
+        <div style="font-size:11px;color:var(--text3)">${[vh.year,vh.plate,vh.type].filter(Boolean).join(' · ')}</div>
+      </div>
+      <button class="btn btn-sm" style="font-size:11px" onclick="editVehicle('${vh.id}')">✏️ Edit</button>
+      <button class="btn-icon del" onclick="removeVehicle('${vh.id}')">✕</button>
+    </div>
+    <div id="veh-edit-${vh.id}" style="display:none;background:var(--surface2);border-radius:var(--rs);padding:12px;margin-bottom:8px;border:1px solid var(--border)">
+      <div class="form-row" style="margin-bottom:8px">
+        <div class="fg" style="margin-bottom:0"><label>Name</label><input type="text" id="veh-edit-name-${vh.id}" value="${vh.name}"></div>
+        <div class="fg" style="margin-bottom:0"><label>Plate</label><input type="text" id="veh-edit-plate-${vh.id}" value="${vh.plate||''}"></div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="fg" style="margin-bottom:0"><label>Year</label><input type="number" id="veh-edit-year-${vh.id}" value="${vh.year||''}"></div>
+        <div class="fg" style="margin-bottom:0"><label>Type</label>
+          <select id="veh-edit-type-${vh.id}">
+            <option value="car" ${vh.type==='car'?'selected':''}>Car 🚗</option>
+            <option value="suv" ${vh.type==='suv'?'selected':''}>SUV 🚙</option>
+            <option value="truck" ${vh.type==='truck'?'selected':''}>Truck 🚛</option>
+            <option value="motorcycle" ${vh.type==='motorcycle'?'selected':''}>Motorcycle 🏍</option>
+            <option value="other" ${vh.type==='other'?'selected':''}>Other 🚘</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-p btn-sm" onclick="saveVehicleEdit('${vh.id}')">Save</button>
+        <button class="btn btn-sm" onclick="editVehicle('${vh.id}')">Cancel</button>
+      </div>
+    </div>
+  `).join('');
+}
+function editVehicle(id){
+  const row=document.getElementById('veh-row-'+id);
+  const editForm=document.getElementById('veh-edit-'+id);
+  if(!row||!editForm)return;
+  const isOpen=editForm.style.display!=='none';
+  editForm.style.display=isOpen?'none':'block';
+}
+async function saveVehicleEdit(id){
+  const name=(document.getElementById('veh-edit-name-'+id)||{}).value||'';
+  if(!name){alert('Name required');return;}
+  const plate=(document.getElementById('veh-edit-plate-'+id)||{}).value||'';
+  const year=(document.getElementById('veh-edit-year-'+id)||{}).value||'';
+  const type=(document.getElementById('veh-edit-type-'+id)||{}).value||'car';
+  const v=getVehicles();
+  const vh=v.find(x=>x.id===id);
+  if(!vh)return;
+  const oldName=vh.name;
+  Object.assign(vh,{name,plate,year,type});
+  saveVehicles(v);
+  if(sbUrl&&sbKey){
+    try{await sbFetch('vehicles?id=eq.'+id,{method:'PATCH',body:JSON.stringify({name,plate,year,type})});}
+    catch(e){console.warn('vehicle update',e);}
+  }
+  // Update any entries that used old name
+  entries.forEach(e=>{if(e.person===oldName)e.person=name;});
+  renderVehiclesList();refreshVehicleDropdowns();
+  toast('Vehicle updated ✓');
 }
 function refreshVehicleDropdowns(){
   const v=getVehicles();
-  const opts=v.map(vh=>'<option value="'+vh.name+'">'+vh.name+'</option>').join('');
-  const vehOpts=v.map(vh=>'<option value="'+vh.id+'">'+vh.name+'</option>').join('');
-  // Main add entry person dropdown
-  const pp=document.getElementById('inp-person');
-  if(pp){
-    const cur=pp.value;
-    // Keep existing non-vehicle options (الجيش etc) + add vehicles
-    const extras='<option value="الجيش">الجيش</option>'+
-      '<option value="كارول">كارول</option>'+
-      '<option value="مانويلا">مانويلا</option>'+
-      '<option value="بابا">بابا</option>'+
-      '<optgroup label="───────────"></optgroup>'+
-      v.map(vh=>'<option value="'+vh.name+'">🚗 '+vh.name+'</option>').join('');
-    pp.innerHTML='<option value="">Select person / vehicle...</option>'+extras;
-    if([...pp.options].find(o=>o.value===cur)) pp.value=cur;
-  }
+  // Format: "Nissan · 123456" or just "Nissan"
+  const vehLabel=vh=>(vh.plate?vh.name+' · '+vh.plate:vh.name);
+  const carOpts=v.map(vh=>'<option value="'+vh.name+'">🚗 '+vehLabel(vh)+'</option>').join('');
+  const vehOpts=v.map(vh=>'<option value="'+vh.id+'">'+vehLabel(vh)+'</option>').join('');
+  const nameOpts=v.map(vh=>'<option value="'+vh.name+'">'+vehLabel(vh)+'</option>').join('');
+
+  // Add entry person dropdown — changes based on type
+  updatePersonDropdown();
+
   // Maintenance vehicle dropdown
-  const mv=document.getElementById('maint-vehicle');if(mv){const c=mv.value;mv.innerHTML='<option value="">Select vehicle...</option>'+vehOpts;if([...mv.options].find(o=>o.value===c))mv.value=c;}
+  const mv=document.getElementById('maint-vehicle');
+  if(mv){const c=mv.value;mv.innerHTML='<option value="">Select vehicle...</option>'+vehOpts;if([...mv.options].find(o=>o.value===c))mv.value=c;}
   // Service vehicle filter
-  const sf=document.getElementById('svc-vehicle-filter');if(sf){const c=sf.value;sf.innerHTML='<option value="">All vehicles</option>'+vehOpts;if([...sf.options].find(o=>o.value===c))sf.value=c;}
-  // Nissan tab vehicle filter
-  const nf=document.getElementById('nissan-vehicle-filter');if(nf){const c=nf.value;nf.innerHTML='<option value="">All vehicles</option>'+opts;if([...nf.options].find(o=>o.value===c))nf.value=c;}
+  const sf=document.getElementById('svc-vehicle-filter');
+  if(sf){const c=sf.value;sf.innerHTML='<option value="">All vehicles</option>'+vehOpts;if([...sf.options].find(o=>o.value===c))sf.value=c;}
+  // Nissan/vehicle tab filter
+  const nf=document.getElementById('nissan-vehicle-filter');
+  if(nf){const c=nf.value;nf.innerHTML='<option value="">All vehicles</option>'+nameOpts;if([...nf.options].find(o=>o.value===c))nf.value=c;}
+  // Edit modal person
+  updateEditPersonDropdown();
+}
+function vehLabel(vh){return vh.plate?vh.name+' · '+vh.plate:vh.name;}
+function updatePersonDropdown(){
+  const pp=document.getElementById('inp-person');if(!pp)return;
+  const type=(document.getElementById('inp-type')||{}).value||'';
+  const cur=pp.value;
+  const v=getVehicles();
+  if(type==='تعبئة'){
+    // Car fill: ONLY saved vehicles
+    pp.innerHTML='<option value="">Select vehicle...</option>'+
+      v.map(vh=>'<option value="'+vh.name+'">🚗 '+vehLabel(vh)+'</option>').join('');
+  } else {
+    // Other types: vehicles + common people
+    const commonPeople=['الجيش','كارول','مانويلا','بابا','مازن','كوكو','إيلي بدر'];
+    pp.innerHTML='<option value="">Select person / vehicle...</option>'+
+      v.map(vh=>'<option value="'+vh.name+'">🚗 '+vehLabel(vh)+'</option>').join('')+
+      '<option disabled>──────────</option>'+
+      commonPeople.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
+  }
+  if([...pp.options].find(o=>o.value===cur)) pp.value=cur;
+}
+function updateEditPersonDropdown(){
+  const ep=document.getElementById('edit-person');if(!ep)return;
+  const v=getVehicles();
+  const commonPeople=['الجيش','كارول','مانويلا','بابا','مازن','كوكو','إيلي بدر'];
+  const cur=ep.value;
+  ep.innerHTML='<option value="">Select...</option>'+
+    v.map(vh=>'<option value="'+vh.name+'">🚗 '+vehLabel(vh)+'</option>').join('')+
+    '<option disabled>──────────</option>'+
+    commonPeople.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
+  if([...ep.options].find(o=>o.value===cur)) ep.value=cur;
 }
 
 const DEFAULT_SVC_TYPES2=[

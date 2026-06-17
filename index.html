@@ -2729,10 +2729,19 @@ async function loadSettingsFromSupabase(){
   }
   const fuelPrice=await sbGetSetting('fuel_price');
   if(fuelPrice) localStorage.setItem('fuel_price_20',fuelPrice);
+  // Load vehicles and service types
+  const vehs=await sbGetSetting('vehicles');
+  if(vehs&&Array.isArray(vehs)){try{localStorage.setItem(LS_VEHICLES,JSON.stringify(vehs));}catch(e){}}
+  const svcT=await sbGetSetting('svc_types2');
+  if(svcT&&Array.isArray(svcT)){try{localStorage.setItem(LS_SVC_TYPES2,JSON.stringify(svcT));}catch(e){}}
+  // Load maintenance entries
+  await loadMaintenanceFromSupabase();
   renderOpTypes();
   renderDefaultOpToggles();
   refreshAllDropdowns();
   loadNissanSettings();
+  renderVehiclesList&&renderVehiclesList();
+  refreshVehicleDropdowns&&refreshVehicleDropdowns();
 }
 function clearCacheReload(){localStorage.removeItem("diesel_tracker_v1");localStorage.removeItem("diesel_tracker_v2");localStorage.removeItem("diesel_tracker_v3");localStorage.removeItem(LS_KEY);toast("Cache cleared — reloading...");setTimeout(()=>location.reload(),800);}
 function clearSetup(){if(!confirm('Disconnect from Supabase? Data already synced stays in DB.'))return;sbUrl='';sbKey='';localStorage.removeItem(CFG_KEY);closeModal('setup-modal');setConnStatus('offline','Not connected');toast('Disconnected');}

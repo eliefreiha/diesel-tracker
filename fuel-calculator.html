@@ -231,6 +231,9 @@ function save() {
       fetchedAt: autoFetched ? Date.now() : null,
       priceDate: lastPriceDate, priceSrc: lastPriceSource
     }));
+    // Shared keys — synced with tracker Nissan settings
+    localStorage.setItem('diesel_fee_lbp_per20', getFee());
+    localStorage.setItem('diesel_fuel_price_20', getP());
   } catch(e) {}
 }
 

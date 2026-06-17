@@ -968,6 +968,11 @@ tr:hover td{background:var(--surface2)}
 // ── Startup: always wipe stale local data ──
 (function(){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
+  // Restore auth token immediately so sbFetch works from the start
+  try{
+    const saved=JSON.parse(localStorage.getItem('sb_session')||'null');
+    if(saved&&saved.token) window._sbAuthToken=saved.token;
+  }catch(e){}
 })();
 
 // ── Constants ──
@@ -2868,9 +2873,9 @@ async function onAuthSuccess(data){
   // Update sbFetch to use auth token
   window._sbAuthToken = token;
   // Clear all cached data so we load fresh from Supabase for this user
+  // (keep sb_session so user stays logged in on refresh)
   ['diesel_vehicles_v1','diesel_maintenance_v2','diesel_svc_types_v2',
-   'diesel_tracker_v4','nissan_settings','fuel_calc_v5',
-   'diesel_fee_lbp_per20','diesel_fuel_price_20'].forEach(k=>localStorage.removeItem(k));
+   'diesel_tracker_v4','fuel_calc_v5'].forEach(k=>localStorage.removeItem(k));
   // Hide auth screen
   document.getElementById('auth-screen').classList.add('hidden');
   // Update header with user name

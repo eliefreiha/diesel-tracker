@@ -257,6 +257,16 @@ tr:hover td{background:var(--surface2)}
 .veh-card{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .veh-card:last-child{border-bottom:none}
 
+/* FAB */
+#fab-add:hover{transform:scale(1.08);box-shadow:0 6px 20px rgba(26,39,68,.4)}
+#fab-add:active{transform:scale(.95)}
+/* Add panel */
+#add-panel.open{transform:translateX(0)!important}
+/* Settings sub-tabs */
+.settings-sub{display:none}.settings-sub.active{display:block}
+/* Stock mini bar badges */
+#sm-10{color:#854d0e}#sm-20{color:#1e40af}#sm-30{color:#065f46}
+
 </style>
 </head>
 <body>
@@ -291,7 +301,35 @@ tr:hover td{background:var(--surface2)}
 </nav>
 
 <!-- LOG -->
+<!-- FAB Add Button -->
+<button id="fab-add" onclick="openAddPanel()" title="Add entry" style="position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--navy);color:#fff;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(26,39,68,.35);z-index:150;display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s">+</button>
+
+<!-- ADD ENTRY PANEL -->
+<div id="add-overlay" onclick="closeAddPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200"></div>
+<div id="add-panel" style="position:fixed;right:0;top:0;bottom:0;width:min(480px,100%);background:var(--surface);z-index:201;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.12)">
+  <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--surface);z-index:1">
+    <span style="font-size:16px;font-weight:600;flex:1">New entry</span>
+    <button onclick="closeAddPanel()" style="background:var(--surface2);border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--text);display:grid;place-items:center">✕</button>
+  </div>
+  <div style="padding:20px;flex:1">
+    <!-- Add entry form content moved here -->
+    <div id="add-panel-content"></div>
+  </div>
+</div>
+
 <div id="page-log" class="page active">
+  <!-- Stock mini bar -->
+  <div id="stock-mini-bar" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:10px 14px;box-shadow:var(--sh)">
+    <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Stock</span>
+    <span id="sm-10" style="font-size:13px;font-weight:600"></span>
+    <span style="color:var(--border2)">·</span>
+    <span id="sm-20" style="font-size:13px;font-weight:600"></span>
+    <span style="color:var(--border2)">·</span>
+    <span id="sm-30" style="font-size:13px;font-weight:600"></span>
+    <span style="color:var(--border2)">·</span>
+    <span id="sm-tanks" style="font-size:13px;font-weight:700;color:var(--navy)"></span>
+    <span style="margin-left:auto;font-size:11px;color:var(--text3)" id="sm-detail"></span>
+  </div>
   <div class="metrics" id="top-metrics"></div>
   <div class="card">
     <div class="tbl-toolbar">
@@ -627,64 +665,79 @@ tr:hover td{background:var(--surface2)}
 
 <!-- SETTINGS -->
 <div id="page-settings" class="page">
-  <div class="form-card">
-    <div class="sec-title" style="margin-bottom:12px">Operation Types</div>
-    <div id="default-op-toggles"></div>
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div class="sec-title" style="margin-bottom:10px">Custom types</div>
-      <div id="op-types-list" style="margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div class="fg" style="margin-bottom:0;flex:1;min-width:120px"><label>Arabic name</label><input type="text" id="new-op-name" placeholder="e.g. تبرع"></div>
-        <div class="fg" style="margin-bottom:0;flex:1"><label>Label (EN)</label><input type="text" id="new-op-label" placeholder="Donation"></div>
-        <div class="fg" style="margin-bottom:0"><label>Coefficient</label><select id="new-op-coeff"><option value="-1">-1 (use)</option><option value="1">+1 (add)</option></select></div>
-        <button class="btn btn-p btn-sm" onclick="addOpType()">Add</button>
+  <!-- Settings sub-tabs -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px">
+    <button class="svc-tab active" onclick="showSettingsTab('operations',this)">⚙ Operations</button>
+    <button class="svc-tab" onclick="showSettingsTab('nissan-s',this)">🚗 Nissan</button>
+    <button class="svc-tab" onclick="showSettingsTab('vehicles-s',this)">🚙 Vehicles</button>
+  </div>
+
+  <!-- OPERATIONS SUB-PAGE -->
+  <div id="settings-operations" class="settings-sub active">
+    <div class="form-card">
+      <div class="sec-title" style="margin-bottom:12px">Operation Types</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Toggle types to show or hide in Add Entry.</p>
+      <div id="default-op-toggles"></div>
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <div class="sec-title" style="margin-bottom:10px">Custom types</div>
+        <div id="op-types-list" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin-bottom:0;flex:1;min-width:120px"><label>Arabic name</label><input type="text" id="new-op-name" placeholder="e.g. تبرع"></div>
+          <div class="fg" style="margin-bottom:0;flex:1"><label>Label (EN)</label><input type="text" id="new-op-label" placeholder="Donation"></div>
+          <div class="fg" style="margin-bottom:0"><label>Coefficient</label><select id="new-op-coeff"><option value="-1">-1 (use)</option><option value="1">+1 (add)</option></select></div>
+          <button class="btn btn-p btn-sm" onclick="addOpType()">Add</button>
+        </div>
       </div>
     </div>
   </div>
-  <div class="form-card">
-    <div class="sec-title" style="margin-bottom:12px">🚗 Nissan Settings</div>
-    <div class="form-row">
-      <div class="fg" style="margin-bottom:0"><label>Deduction mode</label>
-        <select id="nissan-mode" onchange="saveNissanSettings()">
-          <option value="1">Mode 1 — Liter deduction</option>
-          <option value="2" selected>Mode 2 — Cash fee (LBP)</option>
-        </select>
-      </div>
-      <div class="fg" style="margin-bottom:0"><label>km efficiency base (L)</label>
-        <input type="number" id="nissan-base" value="20" step="1" min="1" oninput="saveNissanSettings()">
-      </div>
-    </div>
-    <div class="form-row" style="margin-top:10px">
-      <div class="fg" style="margin-bottom:0"><label>Liters deducted per 20L (Mode 1)</label>
-        <input type="number" id="nissan-deduct" value="1" step="0.5" min="0" max="5" oninput="saveNissanSettings()">
-      </div>
-      <div class="fg" style="margin-bottom:0"><label>Cash fee per 20L — LBP (Mode 2)</label>
+
+  <!-- NISSAN SUB-PAGE -->
+  <div id="settings-nissan-s" class="settings-sub" style="display:none">
+    <div class="form-card">
+      <div class="sec-title" style="margin-bottom:12px">🚗 Nissan Cash Fee</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:14px">The station takes this cash amount per 20L voucher instead of fuel. This is the same value used in the Fuel Calculator.</p>
+      <div class="fg" style="max-width:280px">
+        <label>Cash fee per 20L voucher (LBP)</label>
         <input type="number" id="nissan-fee-lbp" value="115000" step="1000" oninput="saveNissanSettings()">
+        <span class="hint">Station fills equivalent liters of (price − fee)</span>
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-p btn-sm" onclick="bulkUpdateActualLt()">🔄 Recalculate all actual liters</button>
+        <span id="bulk-update-msg" style="font-size:12px;color:var(--text2)"></span>
       </div>
     </div>
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" onclick="bulkUpdateActualLt()">🔄 Recalculate all actual liters</button>
-      <span id="bulk-update-msg" style="font-size:12px;color:var(--text2)"></span>
-    </div>
+    <!-- Hidden fields needed by JS -->
+    <input type="hidden" id="nissan-mode" value="2">
+    <input type="hidden" id="nissan-base" value="20">
+    <input type="hidden" id="nissan-deduct" value="1">
   </div>
-  <div class="form-card">
-    <div class="sec-title" style="margin-bottom:12px">🚗 Vehicles</div>
-    <div id="vehicles-list" style="margin-bottom:12px"></div>
-    <div class="form-row" style="margin-bottom:10px">
-      <div class="fg" style="margin-bottom:0"><label>Name</label><input type="text" id="new-veh-name" placeholder="e.g. Nissan Patrol"></div>
-      <div class="fg" style="margin-bottom:0"><label>Plate / ID</label><input type="text" id="new-veh-plate" placeholder="e.g. 123456"></div>
-      <div class="fg" style="margin-bottom:0"><label>Year</label><input type="number" id="new-veh-year" placeholder="e.g. 2018" min="1990" max="2030"></div>
-      <div class="fg" style="margin-bottom:0"><label>Type</label>
-        <select id="new-veh-type">
-          <option value="car">Car</option>
-          <option value="suv">SUV</option>
-          <option value="truck">Truck</option>
-          <option value="motorcycle">Motorcycle</option>
-          <option value="other">Other</option>
-        </select>
+
+  <!-- VEHICLES SUB-PAGE -->
+  <div id="settings-vehicles-s" class="settings-sub" style="display:none">
+    <div class="form-card">
+      <div class="sec-title" style="margin-bottom:12px">🚙 My Vehicles</div>
+      <div id="vehicles-list" style="margin-bottom:16px"></div>
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <div class="sec-title" style="margin-bottom:10px">Add vehicle</div>
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="fg" style="margin-bottom:0"><label>Name *</label><input type="text" id="new-veh-name" placeholder="e.g. Nissan Patrol"></div>
+          <div class="fg" style="margin-bottom:0"><label>Plate</label><input type="text" id="new-veh-plate" placeholder="e.g. 123456"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="fg" style="margin-bottom:0"><label>Year</label><input type="number" id="new-veh-year" placeholder="2018" min="1990" max="2035"></div>
+          <div class="fg" style="margin-bottom:0"><label>Type</label>
+            <select id="new-veh-type">
+              <option value="car">Car 🚗</option>
+              <option value="suv">SUV 🚙</option>
+              <option value="truck">Truck 🚛</option>
+              <option value="motorcycle">Motorcycle 🏍</option>
+              <option value="other">Other 🚘</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-p btn-sm" onclick="addVehicle()">Add vehicle</button>
       </div>
     </div>
-    <button class="btn btn-p btn-sm" onclick="addVehicle()">Add vehicle</button>
   </div>
 </div>
 
@@ -2203,6 +2256,69 @@ setTimeout(function(){
   vehicles.forEach(function(veh){const odo=getCurrentOdo(veh.id);types.forEach(function(t){const st=getStatus(t,getLastService(t.id,veh.id),odo);if(st&&(st.code==='overdue'||st.code==='soon'))n++;});});
   const badge=document.getElementById('svc-badge');if(badge&&n>0){badge.style.display='inline';badge.textContent=n;}
 },2000);
+
+// ── FAB Panel ──
+function openAddPanel(){
+  document.getElementById('add-overlay').style.display='block';
+  document.getElementById('add-panel').classList.add('open');
+  // Move add form content into panel
+  const form=document.getElementById('page-add');
+  const panel=document.getElementById('add-panel-content');
+  if(form&&panel&&!panel.hasChildNodes()){
+    [...form.children].forEach(c=>panel.appendChild(c));
+  }
+  prefillAddEntry();
+}
+function closeAddPanel(){
+  document.getElementById('add-overlay').style.display='none';
+  document.getElementById('add-panel').classList.remove('open');
+}
+
+// ── Settings sub-tabs ──
+function showSettingsTab(name,btn){
+  document.querySelectorAll('.settings-sub').forEach(el=>{el.style.display='none';el.classList.remove('active');});
+  document.querySelectorAll('.svc-tab').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('settings-'+name);
+  if(el){el.style.display='block';el.classList.add('active');}
+  if(btn)btn.classList.add('active');
+  if(name==='vehicles-s'){renderVehiclesList&&renderVehiclesList();refreshVehicleDropdowns&&refreshVehicleDropdowns();}
+  if(name==='nissan-s') loadNissanSettings&&loadNissanSettings();
+  if(name==='operations'){renderOpTypes&&renderOpTypes();renderDefaultOpToggles&&renderDefaultOpToggles();}
+}
+
+// ── Stock mini bar update ──
+function updateStockMiniBar(){
+  const st=calcStock();
+  const lt10=st.s10*10,lt20=st.s20*20,lt30=st.s30*30;
+  const tanks=((lt10+lt20+lt30)/20).toFixed(1);
+  const el10=document.getElementById('sm-10');
+  const el20=document.getElementById('sm-20');
+  const el30=document.getElementById('sm-30');
+  const elt=document.getElementById('sm-tanks');
+  const eld=document.getElementById('sm-detail');
+  if(el10) el10.textContent=st.s10+'×10L';
+  if(el20) el20.textContent=st.s20+'×20L';
+  if(el30) el30.textContent=st.s30+'×30L';
+  if(elt) elt.textContent=tanks+' tanks';
+  if(eld) eld.textContent=(lt10+lt20+lt30)+' L total';
+}
+
+// Hook into renderAll
+const _origRenderAll=renderAll;
+function renderAll(){
+  _origRenderAll();
+  updateStockMiniBar();
+}
+
+// Close add panel after successful add
+const _origAddEntry=addEntry;
+async function addEntry(){
+  const before=entries.length;
+  await _origAddEntry();
+  if(entries.length>before||document.getElementById('add-preview').textContent.includes('✓')){
+    setTimeout(closeAddPanel,300);
+  }
+}
 
 </script>
 </body>

@@ -385,10 +385,8 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="fg" style="margin-bottom:0"><label>Person / Vehicle</label>
-        <select id="inp-person" onchange="onPersonChange()" style="font-size:13px">
-          <option value="">Select...</option>
-        </select>
-        <input type="hidden" id="inp-person-custom" value="">
+        <input type="text" id="inp-person" list="persons-datalist" placeholder="Type or select..." oninput="onPersonChange()" autocomplete="off">
+        <datalist id="persons-datalist"></datalist>
       </div>
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="inp-notes" placeholder="Optional"></div>
     </div>
@@ -839,9 +837,7 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="fg" style="margin-bottom:0"><label>Person / Vehicle</label>
-        <select id="edit-person" onchange="onEditPersonChange()">
-          <option value="">Select...</option>
-        </select>
+        <input type="text" id="edit-person" list="persons-datalist" placeholder="Type or select..." oninput="onEditPersonChange()" autocomplete="off">
       </div>
       <div class="fg" style="margin-bottom:0"><label>Notes</label><input type="text" id="edit-notes"></div>
     </div>
@@ -1297,7 +1293,7 @@ function prefillAddEntry(){
   // Set to first vehicle
   const vehs=getVehicles();
   updatePersonDropdown&&updatePersonDropdown();
-  if(vehs.length) personEl.value=vehs[0].name;
+  if(vehs.length) personEl.value=vehLabel(vehs[0]);
   else personEl.value=NISSAN_PERSON;
 
   // Reset vouchers
@@ -1404,12 +1400,9 @@ function onPersonChange(){
   const person=personEl?personEl.value:'';
   const type=document.getElementById('inp-type').value;
   const sec=document.getElementById('odo-section');
-  // Show odo section for any vehicle (not just Nissan)
-  const isVehicle=getVehicles().some(v=>v.name===person)||isNissan(person);
+  // Match by name or by label (name · plate)
+  const isVehicle=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);
   if(isVehicle&&type==='تعبئة'){
-    document.getElementById('inp-v10').value=0;
-    document.getElementById('inp-v20').value=0;
-    document.getElementById('inp-v30').value=0;
     sec.classList.remove('hidden');sec.classList.add('visible');
     syncQuickNissanSettings();updateOdoPreview();
   }else{
@@ -1433,8 +1426,8 @@ function onTypeChange(){
     if(pp&&!pp.value&&getVehicles().length) pp.value=getVehicles()[0].name;
   } else if(t==='استلام'){
     updatePersonDropdown&&updatePersonDropdown();
-    // Default monthly allocation: 5×10L, 9×20L, 9×30L
-    if(!person.value||person.value.trim()==='') person.value='الجيش';
+    // Default: Army + monthly allocation
+    if(!person.value||person.value.trim()==='') person.value='الجيش (Army)';
     v10.value=5; v20.value=9; v30.value=9;
   } else {
     // Reset vouchers to 0 when switching to other types
@@ -1664,19 +1657,8 @@ function openEdit(id){
   editingId=id;
   document.getElementById('edit-date').value=e.dateStr;
   document.getElementById('edit-type').value=e.type;
-  // Populate edit person dropdown
   const ep=document.getElementById('edit-person');
-  if(ep){
-    const vehs=getVehicles();
-    const extras='<option value="الجيش">الجيش</option>'+
-      '<option value="كارول">كارول</option>'+
-      '<option value="مانويلا">مانويلا</option>'+
-      '<option value="بابا">بابا</option>'+
-      '<optgroup label="───────────"></optgroup>'+
-      vehs.map(v=>'<option value="'+v.name+'">🚗 '+v.name+'</option>').join('');
-    ep.innerHTML='<option value="">Select...</option>'+extras;
-    ep.value=e.person||'';
-  }
+  if(ep) ep.value=e.person||'';
   document.getElementById('edit-v10').value=e.v10||0;
   document.getElementById('edit-v20').value=e.v20||0;
   document.getElementById('edit-v30').value=e.v30||0;
@@ -2199,7 +2181,7 @@ function refreshVehicleDropdowns(){
   const vehOpts=v.map(vh=>'<option value="'+vh.id+'">'+vehLabel(vh)+'</option>').join('');
   const nameOpts=v.map(vh=>'<option value="'+vh.name+'">'+vehLabel(vh)+'</option>').join('');
 
-  // Add entry person dropdown — changes based on type
+  // Refresh person datalist
   updatePersonDropdown();
 
   // Maintenance vehicle dropdown
@@ -2215,35 +2197,41 @@ function refreshVehicleDropdowns(){
   updateEditPersonDropdown();
 }
 function vehLabel(vh){return vh.plate?vh.name+' · '+vh.plate:vh.name;}
-function updatePersonDropdown(){
-  const pp=document.getElementById('inp-person');if(!pp)return;
-  const type=(document.getElementById('inp-type')||{}).value||'';
-  const cur=pp.value;
+function getPersonSuggestions(type){
   const v=getVehicles();
+  const vehOptions=v.map(vh=>vehLabel(vh));
+  // Get unique persons from existing entries
+  const existing=[...new Set(entries.map(e=>e.person).filter(Boolean))].sort();
+  // Exclude vehicle names to avoid duplicates, exclude الجيش for non-received
+  const people=existing.filter(p=>!v.some(vh=>vh.name===p)&&p!=='الجيش');
   if(type==='تعبئة'){
-    // Car fill: ONLY saved vehicles
-    pp.innerHTML='<option value="">Select vehicle...</option>'+
-      v.map(vh=>'<option value="'+vh.name+'">🚗 '+vehLabel(vh)+'</option>').join('');
+    // Car fill: only vehicles
+    return vehOptions;
+  } else if(type==='استلام'){
+    // Received: Army first + existing people
+    return['الجيش (Army)',...people,...vehOptions];
   } else {
-    // Other types: vehicles + common people
-    const commonPeople=['الجيش','كارول','مانويلا','بابا','مازن','كوكو','إيلي بدر'];
-    pp.innerHTML='<option value="">Select person / vehicle...</option>'+
-      v.map(vh=>'<option value="'+vh.name+'">🚗 '+vehLabel(vh)+'</option>').join('')+
-      '<option disabled>──────────</option>'+
-      commonPeople.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
+    // Other: all people + vehicles
+    return[...people,...vehOptions];
   }
-  if([...pp.options].find(o=>o.value===cur)) pp.value=cur;
+}
+function updatePersonDropdown(){
+  const dl=document.getElementById('persons-datalist');if(!dl)return;
+  const type=(document.getElementById('inp-type')||{}).value||'';
+  const suggestions=getPersonSuggestions(type);
+  dl.innerHTML=suggestions.map(s=>'<option value="'+s+'">').join('');
+  // For car fill, if empty auto-fill first vehicle
+  if(type==='تعبئة'){
+    const pp=document.getElementById('inp-person');
+    if(pp&&!pp.value){
+      const v=getVehicles();
+      if(v.length) pp.value=vehLabel(v[0]);
+    }
+  }
 }
 function updateEditPersonDropdown(){
-  const ep=document.getElementById('edit-person');if(!ep)return;
-  const v=getVehicles();
-  const commonPeople=['الجيش','كارول','مانويلا','بابا','مازن','كوكو','إيلي بدر'];
-  const cur=ep.value;
-  ep.innerHTML='<option value="">Select...</option>'+
-    v.map(vh=>'<option value="'+vh.name+'">🚗 '+vehLabel(vh)+'</option>').join('')+
-    '<option disabled>──────────</option>'+
-    commonPeople.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
-  if([...ep.options].find(o=>o.value===cur)) ep.value=cur;
+  // Same datalist is shared
+  updatePersonDropdown();
 }
 
 const DEFAULT_SVC_TYPES2=[

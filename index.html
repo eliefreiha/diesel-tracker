@@ -1459,9 +1459,12 @@ function renderNissan(){
 
     if(isFull && lastFullOdo!=null){
       const dist=e.odometer-lastFullOdo;
-      const eff=(dist/accumLt*base).toFixed(1);
-      effMap[e.id]=eff;
-      accumMap[e.id]={dist,lt:accumLt.toFixed(1),eff};
+      const eff=accumLt>0&&dist>0?(dist/accumLt*base):null;
+      const effStr=eff&&isFinite(eff)&&eff<2000?eff.toFixed(1):null;
+      if(effStr){
+        effMap[e.id]=effStr;
+        accumMap[e.id]={dist,lt:accumLt.toFixed(1),eff:effStr};
+      }
       // reset accumulator
       lastFullOdo=e.odometer;
       accumLt=0;
@@ -1476,7 +1479,7 @@ function renderNissan(){
   }
 
   // Overall stats (brim-to-brim only)
-  const effVals=Object.values(effMap).map(v=>parseFloat(v)).filter(v=>!isNaN(v));
+  const effVals=Object.values(effMap).map(v=>parseFloat(v)).filter(v=>!isNaN(v)&&isFinite(v)&&v>0&&v<2000);
   const avgEff=effVals.length?(effVals.reduce((a,b)=>a+b,0)/effVals.length).toFixed(1):0;
   const totalNomLt=fills.reduce((s,e)=>s+toLt(e.v10,e.v20,e.v30),0);
   const totalActLt=fills.reduce((s,e)=>s+effectiveLt(e),0);

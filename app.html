@@ -2127,75 +2127,62 @@ function exportExcel(){
 }
 
 function exportPDF(){
-  const name=currentUser?.user_metadata?.name||currentUser?.email||'User';
-  const sorted=[...entries].sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr));
+  const name=(currentUser&&(currentUser.user_metadata&&currentUser.user_metadata.name||currentUser.email))||'User';
+  const sorted=[...entries].sort(function(a,b){return new Date(b.dateStr)-new Date(a.dateStr);});
   const stock=calcStock();
   const totalLt=toLt(stock.v10,stock.v20,stock.v30);
-  
   let rows='';
-  sorted.slice(0,200).forEach(e=>{
+  sorted.slice(0,200).forEach(function(e){
     const lt=toLt(e.v10,e.v20,e.v30);
-    const type=typeLabel(e.type);
-    rows+=`<tr>
-      <td>${e.dateStr}</td>
-      <td>${type}</td>
-      <td>${e.person||'—'}</td>
-      <td style="text-align:center">${e.v10||0}</td>
-      <td style="text-align:center">${e.v20||0}</td>
-      <td style="text-align:center">${e.v30||0}</td>
-      <td style="text-align:right;font-weight:600">${lt}L</td>
-      <td style="text-align:right;color:#059669">${e.actualLt||'—'}</td>
-      <td style="text-align:right">${e.odometer?e.odometer.toLocaleString()+' km':'—'}</td>
-      <td>${e.notes||''}</td>
-    </tr>`;
+    rows+='<tr>'+
+      '<td>'+e.dateStr+'</td>'+
+      '<td>'+typeLabel(e.type)+'</td>'+
+      '<td>'+(e.person||'&mdash;')+'</td>'+
+      '<td style="text-align:center">'+(e.v10||0)+'</td>'+
+      '<td style="text-align:center">'+(e.v20||0)+'</td>'+
+      '<td style="text-align:center">'+(e.v30||0)+'</td>'+
+      '<td style="text-align:right;font-weight:600">'+lt+'L</td>'+
+      '<td style="text-align:right;color:#059669">'+(e.actualLt||'&mdash;')+'</td>'+
+      '<td style="text-align:right">'+(e.odometer?e.odometer.toLocaleString()+' km':'&mdash;')+'</td>'+
+      '<td>'+(e.notes||'')+'</td>'+
+    '</tr>';
   });
-
-  const html2=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Diesel Tracker Report</title>
-  <style>
-    body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:20px}
-    h1{font-size:18px;color:#1a2744;margin-bottom:4px}
-    .subtitle{color:#6b7280;font-size:12px;margin-bottom:16px}
-    .summary{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap}
-    .card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;min-width:120px}
-    .card-label{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}
-    .card-value{font-size:20px;font-weight:700;color:#1a2744}
-    table{width:100%;border-collapse:collapse;font-size:10px}
-    th{background:#1a2744;color:#fff;padding:6px 8px;text-align:left;font-size:10px}
-    td{padding:5px 8px;border-bottom:1px solid #f1f5f9}
-    tr:nth-child(even){background:#f8fafc}
-    .footer{margin-top:16px;font-size:10px;color:#9ca3af;text-align:center}
-    @media print{body{margin:10px}.no-print{display:none}}
-  </style></head><body>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start">
-    <div>
-      <h1>⛽ Diesel Tracker Report</h1>
-      <div class="subtitle">👤 ${name} · Generated ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
-    </div>
-    <button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#1a2744;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🖨️ Print / Save PDF</button>
-  </div>
-  <div class="summary">
-    <div class="card"><div class="card-label">Total Entries</div><div class="card-value">${entries.length}</div></div>
-    <div class="card"><div class="card-label">10L Stock</div><div class="card-value">${stock.v10}</div></div>
-    <div class="card"><div class="card-label">20L Stock</div><div class="card-value">${stock.v20}</div></div>
-    <div class="card"><div class="card-label">30L Stock</div><div class="card-value">${stock.v30}</div></div>
-    <div class="card"><div class="card-label">Total Liters</div><div class="card-value">${totalLt}L</div></div>
-  </div>
-  <table>
-    <thead><tr>
-      <th>Date</th><th>Type</th><th>Person/Vehicle</th>
-      <th>10L</th><th>20L</th><th>30L</th>
-      <th>Total L</th><th>Actual L</th><th>Odometer</th><th>Notes</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  ${sorted.length>200?`<p style="color:#6b7280;margin-top:8px;font-size:10px">Showing 200 of ${sorted.length} entries. Export Excel for full data.</p>`:''}
-  <div class="footer">Diesel Tracker · ${new Date().getFullYear()}</div>
-  </body></html>`;
-  
+  const dateStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  const doc='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Diesel Tracker Report</title>'+
+    '<style>body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:20px}'+
+    'h1{font-size:18px;color:#1a2744;margin-bottom:4px}.subtitle{color:#6b7280;font-size:12px;margin-bottom:16px}'+
+    '.summary{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap}'+
+    '.card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;min-width:120px}'+
+    '.card-label{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}'+
+    '.card-value{font-size:20px;font-weight:700;color:#1a2744}'+
+    'table{width:100%;border-collapse:collapse;font-size:10px}'+
+    'th{background:#1a2744;color:#fff;padding:6px 8px;text-align:left;font-size:10px}'+
+    'td{padding:5px 8px;border-bottom:1px solid #f1f5f9}'+
+    'tr:nth-child(even){background:#f8fafc}'+
+    '.footer{margin-top:16px;font-size:10px;color:#9ca3af;text-align:center}'+
+    '@media print{.no-print{display:none}}</style></head><body>'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+    '<div><h1>Diesel Tracker Report</h1>'+
+    '<div class="subtitle">'+name+' &middot; Generated '+dateStr+'</div></div>'+
+    '<button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#1a2744;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Print / Save PDF</button>'+
+    '</div>'+
+    '<div class="summary">'+
+    '<div class="card"><div class="card-label">Total Entries</div><div class="card-value">'+entries.length+'</div></div>'+
+    '<div class="card"><div class="card-label">10L Stock</div><div class="card-value">'+stock.v10+'</div></div>'+
+    '<div class="card"><div class="card-label">20L Stock</div><div class="card-value">'+stock.v20+'</div></div>'+
+    '<div class="card"><div class="card-label">30L Stock</div><div class="card-value">'+stock.v30+'</div></div>'+
+    '<div class="card"><div class="card-label">Total Liters</div><div class="card-value">'+totalLt+'L</div></div>'+
+    '</div>'+
+    '<table><thead><tr>'+
+    '<th>Date</th><th>Type</th><th>Person/Vehicle</th>'+
+    '<th>10L</th><th>20L</th><th>30L</th>'+
+    '<th>Total L</th><th>Actual L</th><th>Odometer</th><th>Notes</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>'+
+    (sorted.length>200?'<p style="color:#6b7280;margin-top:8px;font-size:10px">Showing 200 of '+sorted.length+' entries.</p>':'')+
+    '<div class="footer">Diesel Tracker &middot; '+new Date().getFullYear()+'</div>'+
+    '</body></html>';
   const win=window.open('','_blank');
-  win.document.write(html2);
-  win.document.close();
+  if(win){win.document.write(doc);win.document.close();}
   toast('PDF preview opened — use Print to save as PDF');
 }
 

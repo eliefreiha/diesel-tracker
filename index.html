@@ -1542,7 +1542,7 @@ async function addEntry(){
   const lt=toLt(v10,v20,v30);
   document.getElementById('add-preview').textContent=`✓ ${typeLabel(type)} — ${lt} L (${(lt/20).toFixed(2)} tanks)`;
   setTimeout(()=>document.getElementById('add-preview').textContent='',3000);
-  refreshPersonList();renderAll();toast('Entry added ✓');
+  refreshPersonList();renderAll();toast('Entry added ✓');updateStockMiniBar();setTimeout(closeAddPanel,400);
 }
 
 // ── Edit ──
@@ -1920,6 +1920,7 @@ if(sbUrl&&sbKey){
   renderAll();
   loadFromSupabase().then(async ()=>{
     renderAll();
+    updateStockMiniBar();
     await loadSettingsFromSupabase();
     prefillAddEntry();
     setTimeout(()=>{if(typeof renderReminders==='function')renderReminders();},600);
@@ -2301,15 +2302,10 @@ function updateStockMiniBar(){
   if(eld) eld.textContent=(lt10+lt20+lt30)+' L total';
 }
 
-// Close add panel after successful add — hook into toast
-const _origToast=toast;
-function toast(msg){
-  _origToast(msg);
-  if(msg&&msg.includes('Entry added')){
-    setTimeout(closeAddPanel,400);
-  }
-  updateStockMiniBar();
-}
+// Update stock bar after page load
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(updateStockMiniBar, 2000);
+});
 
 </script>
 </body>

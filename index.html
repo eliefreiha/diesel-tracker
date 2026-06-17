@@ -1431,9 +1431,8 @@ function onTypeChange(){
     // Auto-select first vehicle
     const pp=document.getElementById('inp-person');
     if(pp&&!pp.value&&getVehicles().length) pp.value=getVehicles()[0].name;
-  } else {
-    updatePersonDropdown&&updatePersonDropdown();
   } else if(t==='استلام'){
+    updatePersonDropdown&&updatePersonDropdown();
     // Default monthly allocation: 5×10L, 9×20L, 9×30L
     if(!person.value||person.value.trim()==='') person.value='الجيش';
     v10.value=5; v20.value=9; v30.value=9;

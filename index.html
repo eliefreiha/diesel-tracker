@@ -1888,18 +1888,41 @@ const LS_VEHICLES='diesel_vehicles_v1';
 const LS_MAINTENANCE2='diesel_maintenance_v2';
 const LS_SVC_TYPES2='diesel_svc_types_v2';
 
-function getVehicles(){try{const s=JSON.parse(localStorage.getItem(LS_VEHICLES)||'null');if(s)return s;}catch(e){}return[{id:'nissan',name:'Nissan',plate:'',year:'',type:'suv'}];}
-function saveVehicles(v){try{localStorage.setItem(LS_VEHICLES,JSON.stringify(v));}catch(e){}if(sbUrl&&sbKey)sbSetSetting('vehicles',v);}
-function addVehicle(){
+// ── Vehicles — Supabase + localStorage cache ──
+function getVehicles(){try{const s=JSON.parse(localStorage.getItem(LS_VEHICLES)||'null');if(s&&s.length)return s;}catch(e){}return[{id:'nissan',name:'Nissan',plate:'',year:'',type:'suv'}];}
+function cacheVehicles(v){try{localStorage.setItem(LS_VEHICLES,JSON.stringify(v));}catch(e){}}
+
+async function loadVehiclesFromSupabase(){
+  if(!sbUrl||!sbKey)return;
+  try{
+    const data=await sbFetch('vehicles?order=created_at.asc');
+    if(data&&data.length){cacheVehicles(data);renderVehiclesList();refreshVehicleDropdowns();}
+  }catch(e){console.warn('vehicles load',e);}
+}
+async function addVehicle(){
   const n=document.getElementById('new-veh-name');if(!n||!n.value.trim()){alert('Enter vehicle name');return;}
-  const v=getVehicles();
-  v.push({id:'veh_'+Date.now(),name:n.value.trim(),plate:(document.getElementById('new-veh-plate')||{}).value||'',year:(document.getElementById('new-veh-year')||{}).value||'',type:(document.getElementById('new-veh-type')||{}).value||'car'});
-  saveVehicles(v);n.value='';
+  const id='veh_'+Date.now();
+  const veh={id,name:n.value.trim(),plate:(document.getElementById('new-veh-plate')||{}).value||'',year:(document.getElementById('new-veh-year')||{}).value||'',type:(document.getElementById('new-veh-type')||{}).value||'car'};
+  // Save to Supabase
+  if(sbUrl&&sbKey){
+    try{await sbFetch('vehicles',{method:'POST',body:JSON.stringify(veh)});}
+    catch(e){console.warn('vehicle insert',e);}
+  }
+  // Update cache
+  const v=getVehicles().filter(x=>x.id!=='nissan'||x.name!=='Nissan'?true:false);
+  // Actually just reload from Supabase
+  await loadVehiclesFromSupabase();
+  n.value='';
   const pe=document.getElementById('new-veh-plate');if(pe)pe.value='';
   const ye=document.getElementById('new-veh-year');if(ye)ye.value='';
   renderVehiclesList();refreshVehicleDropdowns();toast('Vehicle added ✓');
 }
-function removeVehicle(id){if(!confirm('Remove vehicle?'))return;saveVehicles(getVehicles().filter(v=>v.id!==id));renderVehiclesList();refreshVehicleDropdowns();}
+async function removeVehicle(id){
+  if(!confirm('Remove vehicle?'))return;
+  if(sbUrl&&sbKey){try{await sbFetch('vehicles?id=eq.'+id,{method:'DELETE'});}catch(e){console.warn('vehicle delete',e);}}
+  cacheVehicles(getVehicles().filter(v=>v.id!==id));
+  renderVehiclesList();refreshVehicleDropdowns();toast('Removed');
+}
 function renderVehiclesList(){
   const el=document.getElementById('vehicles-list');if(!el)return;
   const v=getVehicles();const icons={car:'🚗',suv:'🚙',truck:'🚛',motorcycle:'🏍',other:'🚘'};
@@ -1925,18 +1948,52 @@ const DEFAULT_SVC_TYPES2=[
   {id:'wipers',name:'Wiper blades',reminder:{type:'both',km:20000,timeVal:1,timeUnit:'years'}},
   {id:'ac',name:'AC service',reminder:{type:'both',km:20000,timeVal:1,timeUnit:'years'}},
 ];
-function getServiceTypes2(){try{const s=JSON.parse(localStorage.getItem(LS_SVC_TYPES2)||'null');if(s)return s;}catch(e){}return DEFAULT_SVC_TYPES2.map(t=>({...t}));}
-function saveServiceTypes2(t){try{localStorage.setItem(LS_SVC_TYPES2,JSON.stringify(t));}catch(e){}if(sbUrl&&sbKey)sbSetSetting('svc_types2',t);}
-function addServiceType(){
+// ── Service types — Supabase + localStorage cache ──
+function getServiceTypes2(){try{const s=JSON.parse(localStorage.getItem(LS_SVC_TYPES2)||'null');if(s&&s.length)return s;}catch(e){}return DEFAULT_SVC_TYPES2.map(t=>({...t}));}
+function cacheSvcTypes(t){try{localStorage.setItem(LS_SVC_TYPES2,JSON.stringify(t));}catch(e){}}
+
+async function loadSvcTypesFromSupabase(){
+  if(!sbUrl||!sbKey)return;
+  try{
+    const data=await sbFetch('service_types?order=created_at.asc');
+    if(data&&data.length){cacheSvcTypes(data);renderServiceTypesList();}
+    else{
+      // No custom types in DB — seed defaults
+      await seedDefaultSvcTypes();
+    }
+  }catch(e){console.warn('svc_types load',e);}
+}
+async function seedDefaultSvcTypes(){
+  if(!sbUrl||!sbKey)return;
+  try{
+    for(const t of DEFAULT_SVC_TYPES2){
+      await sbFetch('service_types',{method:'POST',headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({id:t.id,name:t.name,reminder:t.reminder})});
+    }
+    const data=await sbFetch('service_types?order=created_at.asc');
+    if(data&&data.length) cacheSvcTypes(data);
+  }catch(e){console.warn('seed svc types',e);}
+}
+async function addServiceType(){
   const n=document.getElementById('new-svc-name');if(!n||!n.value.trim()){alert('Enter service name');return;}
   const rType=document.getElementById('new-svc-reminder-type').value;
   const reminder={type:rType};
   if(rType==='km'||rType==='both') reminder.km=parseInt(document.getElementById('new-svc-km').value)||0;
   if(rType==='time'||rType==='both'){reminder.timeVal=parseInt(document.getElementById('new-svc-time-val').value)||0;reminder.timeUnit=document.getElementById('new-svc-time-unit').value;}
-  const types=getServiceTypes2();types.push({id:'svc_'+Date.now(),name:n.value.trim(),reminder});
-  saveServiceTypes2(types);n.value='';renderServiceTypesList();toast('Added');
+  const id='svc_'+Date.now();
+  const newType={id,name:n.value.trim(),reminder};
+  if(sbUrl&&sbKey){
+    try{await sbFetch('service_types',{method:'POST',body:JSON.stringify(newType)});}
+    catch(e){console.warn('svc type insert',e);}
+  }
+  const types=getServiceTypes2();types.push(newType);cacheSvcTypes(types);
+  n.value='';renderServiceTypesList();toast('Added ✓');
 }
-function removeServiceType(id){if(!confirm('Remove?'))return;saveServiceTypes2(getServiceTypes2().filter(t=>t.id!==id));renderServiceTypesList();}
+async function removeServiceType(id){
+  if(!confirm('Remove?'))return;
+  if(sbUrl&&sbKey){try{await sbFetch('service_types?id=eq.'+id,{method:'DELETE'});}catch(e){console.warn('svc type delete',e);}}
+  cacheSvcTypes(getServiceTypes2().filter(t=>t.id!==id));
+  renderServiceTypesList();toast('Removed');
+}
 function updateSvcReminderVisibility(val){
   const km=document.getElementById('new-svc-km-wrap');const ti=document.getElementById('new-svc-time-wrap');
   if(km)km.style.display=(val==='km'||val==='both')?'':'none';

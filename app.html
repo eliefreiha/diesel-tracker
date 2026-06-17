@@ -1612,7 +1612,11 @@ function onEditPersonChange(){
   const person=document.getElementById('edit-person').value;
   const type=document.getElementById('edit-type').value;
   const isVeh1=getVehicles().some(v=>v.name===person||vehLabel(v)===person)||isNissan(person);
-  document.getElementById('edit-odo-section').classList.toggle('hidden',!(isVeh1&&type==='تعبئة'));
+  const editSec1=document.getElementById('edit-odo-section');
+  if(editSec1){
+    if(isVeh1&&type==='تعبئة'){editSec1.classList.add('visible');editSec1.classList.remove('hidden');}
+    else{editSec1.classList.remove('visible');editSec1.classList.add('hidden');}
+  }
 }
 function onEditTypeChange(){onEditPersonChange();}
 
@@ -1752,7 +1756,11 @@ function openEdit(id){
   if(document.getElementById('edit-full-fill')) document.getElementById('edit-full-fill').checked=e.fullFill!==false;
   document.getElementById('edit-notes').value=e.notes||'';
   const isVeh2=getVehicles().some(v=>v.name===e.person||vehLabel(v)===e.person)||isNissan(e.person);
-  document.getElementById('edit-odo-section').classList.toggle('hidden',!(isVeh2&&e.type==='تعبئة'));
+  const editSec2=document.getElementById('edit-odo-section');
+  if(editSec2){
+    if(isVeh2&&e.type==='تعبئة'){editSec2.classList.add('visible');editSec2.classList.remove('hidden');}
+    else{editSec2.classList.remove('visible');editSec2.classList.add('hidden');}
+  }
   document.getElementById('edit-modal').classList.add('open');
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');editingId=null;}

@@ -2286,11 +2286,22 @@ async function saveVehicleEdit(id){
     try{await sbFetch('vehicles?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({name,plate,year,type})});}
     catch(e){console.warn('vehicle update',e);}
   }
-  // Update any entries that used old name
+  // Update all entries that used the old vehicle name → new name
   entries.forEach(e=>{if(e.person===oldName)e.person=name;});
+  // Also update in Supabase
+  if(sbUrl&&sbKey&&oldName!==name){
+    try{
+      await sbFetch('diesel_entries?person=eq.'+encodeURIComponent(oldName),{
+        method:'PATCH',
+        body:JSON.stringify({person:name})
+      });
+      console.log('Updated entries person name from '+oldName+' to '+name);
+    }catch(e){console.warn('entry rename',e);}
+  }
   // Reload from Supabase to get fresh data
   await loadVehiclesFromSupabase();
   renderVehiclesList();refreshVehicleDropdowns();
+  renderAll&&renderAll();
   toast('Vehicle updated ✓');
 }
 function refreshVehicleDropdowns(){

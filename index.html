@@ -944,10 +944,13 @@ function saveNissanSettings(){
   const obj={deduct:d,base:b,mode:m,feeLbp:f};
   try{
     localStorage.setItem(LS_NISSAN,JSON.stringify(obj));
-    // Write to shared key so fuel calculator picks it up
     localStorage.setItem('diesel_fee_lbp_per20',f);
+    localStorage.setItem('diesel_fuel_price_20',localStorage.getItem('diesel_fuel_price_20')||'2350000');
   }catch(e){}
-  if(sbUrl&&sbKey) sbSetSetting('nissan_settings',obj);
+  if(sbUrl&&sbKey){
+    sbSetSetting('nissan_settings',obj);
+    sbSetSetting('fuel_fee_lbp',f);
+  }
   refreshActualLtHint&&refreshActualLtHint();
   renderNissan&&renderNissan();
 }

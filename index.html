@@ -2016,16 +2016,19 @@ function showPage(name,btn){
   if(name==='settings'){renderVehiclesList&&renderVehiclesList();refreshVehicleDropdowns&&refreshVehicleDropdowns();renderOpTypes&&renderOpTypes();renderDefaultOpToggles&&renderDefaultOpToggles();}
   if(name==='nissan') renderNissan&&renderNissan();
   if(name==='fuel'){
-    setTimeout(()=>{
-      const fi=document.getElementById('fc-fee-lbp');
-      const pi=document.getElementById('fc-price20');
-      const fee=localStorage.getItem('diesel_fee_lbp_per20');
-      const price=localStorage.getItem('diesel_fuel_price_20');
-      if(fi){fi.value=fee||(typeof getNissanFeeLbp==='function'?getNissanFeeLbp():115000);}
-      if(pi){pi.value=price||2350000;}
-      if(typeof fcRecalc==='function') fcRecalc();
-      if(typeof fcInit==='function') fcInit();
-    },50);
+    // Set values first, then recalc
+    const fi=document.getElementById('fc-fee-lbp');
+    const pi=document.getElementById('fc-price20');
+    if(fi&&!parseFloat(fi.value)){
+      fi.value=localStorage.getItem('diesel_fee_lbp_per20')||(typeof getNissanFeeLbp==='function'?getNissanFeeLbp():115000);
+    }
+    if(pi&&!parseFloat(pi.value)){
+      pi.value=localStorage.getItem('diesel_fuel_price_20')||2350000;
+    }
+    // Run recalc multiple times to ensure it works
+    if(typeof fcRecalc==='function'){fcRecalc();}
+    setTimeout(()=>{if(typeof fcRecalc==='function')fcRecalc();},100);
+    setTimeout(()=>{if(typeof fcInit==='function')fcInit();},200);
   }
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));

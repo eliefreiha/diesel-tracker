@@ -1858,15 +1858,7 @@ function renderNissan(){
     const firstFull=fullFillsWithOdo[0];
     const lastFull=fullFillsWithOdo[fullFillsWithOdo.length-1];
     overallDist=lastFull.odometer-firstFull.odometer;
-    // Sum all liters between first full and last full (inclusive of fills in between, excluding first fill itself)
-    const inBetween=fills.filter(e=>
-      new Date(e.dateStr)>new Date(firstFull.dateStr)||
-      (e.dateStr===firstFull.dateStr&&e.id>firstFull.id)
-    ).filter(e=>
-      new Date(e.dateStr)<new Date(lastFull.dateStr)||
-      (e.dateStr===lastFull.dateStr&&e.id<=lastFull.id)
-    );
-    overallLt=inBetween.reduce((s,e)=>s+effectiveLt(e),0);
+    overallLt=effectiveLt(lastFull);
     if(overallLt>0&&overallDist>0){
       overallEff=(overallDist/overallLt*base).toFixed(1);
     }
@@ -1971,7 +1963,7 @@ function renderNissanFiltered(fills,distMap,effMap,accumMap,effectiveLt,base){
     if(rangeFull.length>=2){
       const rFirst=rangeFull[0], rLast=rangeFull[rangeFull.length-1];
       const rDist=rLast.odometer-rFirst.odometer;
-      const rLt=filtered.filter(e=>new Date(e.dateStr)>=new Date(rFirst.dateStr)).reduce((s,e)=>s+(effectiveLt?effectiveLt(e):toLt(e.v10,e.v20,e.v30)),0);
+      const rLt=effectiveLt?effectiveLt(rLast):toLt(rLast.v10,rLast.v20,rLast.v30);
       const rEff=rLt>0&&rDist>0?(rDist/rLt*base2).toFixed(1):'—';
       document.getElementById('nissan-range-avg').innerHTML=`<strong>${rangeFull.length} full fills</strong> · <strong>${rEff} km/${base2}L</strong> · ${rDist.toLocaleString()} km / ${rLt.toFixed(0)}L`;
     } else {

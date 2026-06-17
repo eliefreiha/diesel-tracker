@@ -1056,9 +1056,17 @@ function setConnStatus(state,text){
 // ── Supabase API ──
 async function sbFetch(path,opts={}){
   if(!sbUrl||!sbKey)return null;
+  const extraHeaders=opts.headers||{};
+  const {headers:_,...restOpts}=opts;
   const r=await fetch(sbUrl+'/rest/v1/'+path,{
-    headers:{'apikey':sbKey,'Authorization':`Bearer ${sbKey}`,'Content-Type':'application/json','Prefer':'return=representation',...(opts.headers||{})},
-    ...opts
+    ...restOpts,
+    headers:{
+      'apikey':sbKey,
+      'Authorization':`Bearer ${sbKey}`,
+      'Content-Type':'application/json',
+      'Prefer':'return=representation',
+      ...extraHeaders
+    }
   });
   if(!r.ok){const t=await r.text();throw new Error(t);}
   return r.status===204?null:r.json();

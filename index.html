@@ -310,6 +310,10 @@ tr:hover td{background:var(--surface2)}
 .auth-msg.error{color:#dc2626}.auth-msg.success{color:#059669}
 #auth-screen.hidden{display:none}
 
+/* ── SERVICE BADGE ── */
+.nav-badge{position:absolute;top:-4px;right:-6px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;pointer-events:none}
+.nav-btn{position:relative}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -2483,6 +2487,45 @@ function getStatus(t,last,odo){
   if(soon)return{code:'soon',label:'⏰ Due soon',cls:'status-soon',next};
   return{code:'ok',label:'✅ OK',cls:'status-ok',next};
 }
+function updateServiceBadge(){
+  const badge=document.getElementById('svc-badge');
+  if(!badge)return;
+  // Count overdue/due reminders
+  const vehs=getVehicles();
+  let dueCount=0;
+  svcTypes.forEach(svc=>{
+    if(!svc.active||!svc.reminder)return;
+    const km=svc.reminder.km;
+    const months=svc.reminder.months;
+    vehs.forEach(veh=>{
+      // Find last service for this vehicle+type
+      const last=maintenance.filter(m=>m.vehicleId===veh.id&&m.services&&m.services.includes(svc.id))
+        .sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr))[0];
+      // Get last fill odometer for this vehicle
+      const lastFill=entries.filter(e=>e.type==='تعبئة'&&(e.person===veh.name||e.person===vehLabel(veh)))
+        .sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr))[0];
+      const currentOdo=lastFill&&lastFill.odometer?lastFill.odometer:0;
+      if(km&&currentOdo>0){
+        const lastOdo=last&&last.odometer?last.odometer:0;
+        const kmSince=currentOdo-lastOdo;
+        if(kmSince>=km*0.9) dueCount++; // due within 10%
+      }
+      if(months&&!km){
+        const lastDate=last?new Date(last.dateStr):null;
+        if(!lastDate){dueCount++;return;}
+        const monthsSince=(Date.now()-lastDate)/(1000*60*60*24*30);
+        if(monthsSince>=months*0.9) dueCount++;
+      }
+    });
+  });
+  if(dueCount>0){
+    badge.textContent=dueCount;
+    badge.style.display='flex';
+  } else {
+    badge.style.display='none';
+  }
+}
+
 function renderReminders(){
   const types=getServiceTypes2(),vehicles=getVehicles();
   const fv=(document.getElementById('svc-vehicle-filter')||{}).value||'';
@@ -2914,7 +2957,10 @@ async function onAuthSuccess(data){
     updateStockMiniBar&&updateStockMiniBar();
     await loadSettingsFromSupabase();
     prefillAddEntry&&prefillAddEntry();
-    setTimeout(()=>renderReminders&&renderReminders(),600);
+    setTimeout(()=>{
+      renderReminders&&renderReminders();
+      updateServiceBadge&&updateServiceBadge();
+    },600);
   }catch(e){setConnStatus('offline','Load failed: '+e.message);}
 }
 

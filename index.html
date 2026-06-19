@@ -2490,41 +2490,42 @@ function getStatus(t,last,odo){
 function updateServiceBadge(){
   const badge=document.getElementById('svc-badge');
   if(!badge)return;
-  // Count overdue/due reminders
   const vehs=getVehicles();
+  if(!vehs.length||!svcTypes||!svcTypes.length){badge.style.display='none';return;}
   let dueCount=0;
-  svcTypes.forEach(svc=>{
+  svcTypes.forEach(function(svc){
     if(!svc.active||!svc.reminder)return;
-    const km=svc.reminder.km;
-    const months=svc.reminder.months;
-    vehs.forEach(veh=>{
-      // Find last service for this vehicle+type
-      const last=maintenance.filter(m=>m.vehicleId===veh.id&&m.services&&m.services.includes(svc.id))
-        .sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr))[0];
-      // Get last fill odometer for this vehicle
-      const lastFill=entries.filter(e=>e.type==='تعبئة'&&(e.person===veh.name||e.person===vehLabel(veh)))
-        .sort((a,b)=>new Date(b.dateStr)-new Date(a.dateStr))[0];
-      const currentOdo=lastFill&&lastFill.odometer?lastFill.odometer:0;
-      if(km&&currentOdo>0){
-        const lastOdo=last&&last.odometer?last.odometer:0;
-        const kmSince=currentOdo-lastOdo;
-        if(kmSince>=km*0.9) dueCount++; // due within 10%
+    const kmThresh=svc.reminder.km;
+    const moThresh=svc.reminder.months;
+    vehs.forEach(function(veh){
+      // Last maintenance for this vehicle+service
+      const lastM=(maintenance||[]).filter(function(m){
+        return m.vehicleId===veh.id&&m.services&&m.services.some(function(s){return s===svc.id||s===svc.name;});
+      }).sort(function(a,b){return new Date(b.dateStr)-new Date(a.dateStr);})[0];
+      // Current odometer from latest fill
+      const lastFill=entries.filter(function(e){
+        return e.type==='تعبئة'&&(e.person===veh.name||vehLabel(veh)===e.person)&&e.odometer;
+      }).sort(function(a,b){return new Date(b.dateStr)-new Date(a.dateStr);})[0];
+      const curOdo=lastFill?lastFill.odometer:0;
+      if(kmThresh&&curOdo>0){
+        const lastOdo=lastM&&lastM.odometer?lastM.odometer:0;
+        if(curOdo-lastOdo>=kmThresh*0.9)dueCount++;
       }
-      if(months&&!km){
-        const lastDate=last?new Date(last.dateStr):null;
-        if(!lastDate){dueCount++;return;}
-        const monthsSince=(Date.now()-lastDate)/(1000*60*60*24*30);
-        if(monthsSince>=months*0.9) dueCount++;
+      if(moThresh&&!kmThresh){
+        if(!lastM){dueCount++;return;}
+        const moSince=(Date.now()-new Date(lastM.dateStr))/(1000*60*60*24*30.4);
+        if(moSince>=moThresh*0.9)dueCount++;
       }
     });
   });
   if(dueCount>0){
     badge.textContent=dueCount;
-    badge.style.display='flex';
+    badge.style.display='inline-block';
   } else {
     badge.style.display='none';
   }
 }
+
 
 function renderReminders(){
   const types=getServiceTypes2(),vehicles=getVehicles();

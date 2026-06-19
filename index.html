@@ -2882,7 +2882,14 @@ async function onAuthSuccess(data){
   currentUser = data.user || data;
   const token = data.access_token;
   // Store session
-  try{localStorage.setItem('sb_session', JSON.stringify({token, user: currentUser}));}catch(e){}
+  try{
+    const _sess=JSON.stringify({token,user:currentUser,savedAt:Date.now()});
+    localStorage.setItem('sb_session',_sess);
+    sessionStorage.setItem('sb_session',_sess);
+    const _exp=new Date(Date.now()+30*24*60*60*1000).toUTCString();
+    document.cookie='sb_token='+encodeURIComponent(token)+';expires='+_exp+';path=/;SameSite=Lax';
+    document.cookie='sb_user='+encodeURIComponent(JSON.stringify(currentUser))+';expires='+_exp+';path=/;SameSite=Lax';
+  }catch(e){}
   // Update sbFetch to use auth token
   window._sbAuthToken = token;
   // Clear all cached data so we load fresh from Supabase for this user

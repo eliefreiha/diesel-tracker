@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- v2.2.1 build 1781709371 -->
+<!-- v2.3.1 build 1781709371 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛽</text></svg>">
-<title>Diesel Tracker v2.2.1</title>
+<title>Diesel Tracker v2.3.1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 /* ── Reset ── */
@@ -315,12 +315,12 @@ tr:hover td{background:var(--surface2)}
 </head>
 <body>
 
-<div class="version-badge">v2.2.1</div>
+<div class="version-badge">v2.3.1</div>
 <!-- HEADER -->
 <header class="header">
   <div class="header-icon">⛽</div>
   <div class="header-titles">
-    <h1>Diesel Tracker <span class="ver-tag">v2.2.1</span></h1>
+    <h1>Diesel Tracker <span class="ver-tag">v2.3.1</span></h1>
     <p>Voucher management · Vehicles · Service</p>
   </div>
   <div class="header-actions">
@@ -991,7 +991,15 @@ tr:hover td{background:var(--surface2)}
 // ── Startup: always wipe stale local data ──
 (function(){
   ['diesel_tracker_v1','diesel_tracker_v2','diesel_tracker_v3','diesel_tracker_v4'].forEach(k=>localStorage.removeItem(k));
-  try{const _s=JSON.parse(localStorage.getItem('sb_session')||'null');if(_s&&_s.token)window._sbAuthToken=_s.token;}catch(e){}
+  try{
+    let _s=JSON.parse(localStorage.getItem('sb_session')||'null');
+    if(!_s||!_s.token){_s=JSON.parse(sessionStorage.getItem('sb_session')||'null');}
+    if(!_s||!_s.token){
+      const _m=document.cookie.match(/sb_token=([^;]+)/);
+      if(_m){_s={token:decodeURIComponent(_m[1])};}
+    }
+    if(_s&&_s.token)window._sbAuthToken=_s.token;
+  }catch(e){}
 })();
 
 // ── Constants ──
